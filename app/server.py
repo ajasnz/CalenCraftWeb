@@ -14,6 +14,9 @@ def create_app():
     log = logging.getLogger(__name__)
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    # Reload templates from disk on every request in non-production environments
+    if os.getenv("FLASK_ENV") != "production":
+        app.config["TEMPLATES_AUTO_RELOAD"] = True
 
     # ── Secret key ──────────────────────────────────────────────────────
     secret_key = os.getenv("SECRET_KEY", "")
@@ -44,11 +47,28 @@ def create_app():
     from app.routes.auth import auth_bp
     from app.routes.ui import ui_bp
     from app.routes.public import public_bp
+    from app.routes.setup import setup_bp
 
     app.register_blueprint(feed_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(ui_bp)
     app.register_blueprint(public_bp)
+    app.register_blueprint(setup_bp)
+
+    # ── First-run gate: redirect everything to /setup when no users exist ─
+    from flask import redirect, url_for, request as flask_request
+
+    _SETUP_EXEMPT = {"/setup", "/health", "/static"}
+
+    @app.before_request
+    def first_run_gate():
+        path = flask_request.path
+        # Allow setup route, health check, and static files through unconditionally
+        if path == "/setup" or path.startswith("/static") or path == "/health":
+            return
+        # Only check if no users exist (cheap query, cached after first user is created)
+        if not app.db.get_users():
+            return redirect("/setup")
 
     # ── Health check ────────────────────────────────────────────────────
     @app.route("/health")

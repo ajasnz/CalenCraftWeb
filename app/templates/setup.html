@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup — CalenCraft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>body { font-family: "Inter", system-ui, sans-serif; }</style>
+</head>
+<body>
+<div class="page-wrap">
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="auth-card" style="max-width:420px">
+      <div class="auth-logo">🗓</div>
+      <h1>Welcome to CalenCraft</h1>
+      <p class="tagline" style="margin-bottom:.5rem">Create your admin account to get started.</p>
+      <p class="tagline" style="font-size:.78rem;color:var(--muted-light)">This page is only shown once — when no users exist.</p>
+
+      <form method="post" style="text-align:left;margin-top:1.5rem">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" required autofocus autocomplete="username"
+               pattern="[a-zA-Z0-9_\-]+" title="Letters, numbers, hyphens and underscores only"
+               placeholder="e.g. admin">
+
+        <label for="display_name">Display Name <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input id="display_name" name="display_name" type="text" placeholder="Your full name">
+
+        <label for="email">Email <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input id="email" name="email" type="email" placeholder="you@example.com">
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="new-password"
+               minlength="8" placeholder="At least 8 characters">
+
+        <label for="confirm_password">Confirm Password</label>
+        <input id="confirm_password" name="confirm_password" type="password" required autocomplete="new-password">
+
+        <button type="submit" class="btn" style="width:100%;justify-content:center;margin-top:1.35rem">
+          Create Admin Account
+        </button>
+      </form>
+    </div>
+  </main>
+</div>
+</body>
+</html>
