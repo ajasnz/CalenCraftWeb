@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Users — Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Users</h2>
+  <a class="btn" href="{{ url_for('ui.admin_user_new') }}">+ New User</a>
+</div>
+<div class="table-wrap"><table>
+  <thead>
+    <tr><th>Username</th><th>Display Name</th><th>Email</th><th>State</th><th>Admin</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.username }}</td>
+    <td>{{ u.display_name or '—' }}</td>
+    <td>{{ u.email or '—' }}</td>
+    <td><span class="badge badge-{{ u.state }}">{{ u.state }}</span></td>
+    <td>{% if u.is_admin %}<span style="color:var(--primary)">✓</span>{% endif %}</td>
+    <td class="row-actions">
+      <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.admin_user_reset_password', user_id=u.id) }}">Reset Password</a>
+      {% if u.id != session.user_id %}
+      <form method="post" action="{{ url_for('ui.admin_user_delete', user_id=u.id) }}" onsubmit="return confirm('Delete user {{ u.username }}?')">
+        <button class="btn btn-sm btn-danger">Delete</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endblock %}

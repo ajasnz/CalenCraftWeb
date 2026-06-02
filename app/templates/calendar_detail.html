@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+{% block title %}{{ cal.title }} — CalenCraft{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>{{ cal.title }}</h2>
+</div>
+
+<div class="tabs" id="tabs">
+  {% for tid, label in [('sources','Sources'),('views','Views'),('filters','Filters'),('rules','Rules'),('sharing','Sharing'),('advanced','Advanced')] %}
+  <a class="tab {% if active_tab == tid %}active{% endif %}" href="?tab={{ tid }}" onclick="showTab('{{ tid }}',this,event)">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{# ── SOURCES ── #}
+<section class="tab-panel {% if active_tab != 'sources' %}hidden{% endif %}" id="tab-sources">
+  <div class="section-header">
+    <h3>Sources</h3>
+    <a class="btn btn-sm" href="{{ url_for('ui.source_add', calendar_slug=cal.slug) }}">+ Add Source</a>
+  </div>
+  {% if sources %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Name</th><th>URL</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for s in sources %}
+    <tr id="src-row-{{ s.id }}" class="{% if not s.enabled %}src-disabled{% endif %}">
+      <td>
+        {{ s.name }}
+        {% if not s.enabled %}<span class="badge badge-disabled" style="margin-left:.4rem">Disabled</span>{% endif %}
+      </td>
+      <td class="url-cell"><code>{{ s.url }}</code></td>
+      <td>
+        <span class="test-status" id="test-{{ s.id }}" style="font-size:.8rem;color:var(--muted)">—</span>
+      </td>
+      <td class="row-actions">
+        <button class="btn btn-sm btn-ghost" onclick="testSource({{ s.id }}, '{{ url_for('ui.source_test', calendar_slug=cal.slug, source_id=s.id) }}')" title="Test URL">Test</button>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.source_edit', calendar_slug=cal.slug, source_id=s.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('ui.source_toggle', calendar_slug=cal.slug, source_id=s.id) }}">
+          <button class="btn btn-sm btn-ghost">{% if s.enabled %}Disable{% else %}Enable{% endif %}</button>
+        </form>
+        <form method="post" action="{{ url_for('ui.source_delete', calendar_slug=cal.slug, source_id=s.id) }}" onsubmit="return confirm('Remove this source?')">
+          <button class="btn btn-sm btn-danger">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">No sources yet. <a href="{{ url_for('ui.source_add', calendar_slug=cal.slug) }}">Add one</a>.</p>
+  {% endif %}
+</section>
+
+{# ── VIEWS ── #}
+<section class="tab-panel {% if active_tab != 'views' %}hidden{% endif %}" id="tab-views">
+  <div class="section-header">
+    <h3>Views</h3>
+    <a class="btn btn-sm" href="{{ url_for('ui.view_new', calendar_slug=cal.slug) }}">+ New View</a>
+  </div>
+  <div class="feed-url-box">
+    <strong>Default feed:</strong>
+    <code id="default-feed-url">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
+    <button class="btn btn-sm btn-ghost" onclick="copyUrl('default-feed-url', this)">Copy</button>
+    {% if cal.share_viewer %}
+    <strong>Viewer:</strong>
+    <code id="default-view-url">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
+    <button class="btn btn-sm btn-ghost" onclick="copyUrl('default-view-url', this)">Copy</button>
+    {% endif %}
+  </div>
+  {% if not cal.default_view_enabled %}
+  <div class="info-box" style="margin-bottom:.875rem;background:var(--warning-bg);border-color:#fde68a;color:var(--warning)">
+    The default view is currently disabled. Enable it in the Advanced tab.
+  </div>
+  {% endif %}
+  {% if views %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Title</th><th>Slug</th><th>Feed URL</th><th></th></tr></thead>
+    <tbody>
+    {% for v in views %}
+    <tr>
+      <td>{{ v.title }}</td>
+      <td><code>{{ v.slug }}</code></td>
+      <td>
+        <code id="feed-{{ v.id }}">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/{{ v.slug }}</code>
+        <button class="btn btn-sm btn-ghost" onclick="copyUrl('feed-{{ v.id }}', this)">Copy</button>
+      </td>
+      <td>
+        <form method="post" action="{{ url_for('ui.view_delete', calendar_slug=cal.slug, view_id=v.id) }}" onsubmit="return confirm('Delete this view?')">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">No views yet. <a href="{{ url_for('ui.view_new', calendar_slug=cal.slug) }}">Create one</a>.</p>
+  {% endif %}
+</section>
+
+{# ── FILTERS ── #}
+<section class="tab-panel {% if active_tab != 'filters' %}hidden{% endif %}" id="tab-filters">
+  <div class="section-header">
+    <h3>Filters</h3>
+    <a class="btn btn-sm" href="{{ url_for('ui.filter_new', calendar_slug=cal.slug) }}">+ New Filter</a>
+  </div>
+  <p class="hint" style="margin-bottom:.875rem">Filters include or exclude events before they appear in the feed.</p>
+  {% if filters %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Priority</th><th>Scope</th><th>Condition</th><th>Action</th><th></th></tr></thead>
+    <tbody>
+    {% for f in filters %}
+    <tr>
+      <td>{{ f.priority }}</td>
+      <td>
+        {% if f.source_id %}Source: <em>{{ sources_by_id.get(f.source_id, f.source_id) }}</em>
+        {% elif f.view_id %}View: <em>{{ views_by_id.get(f.view_id, f.view_id) }}</em>
+        {% else %}<span style="color:var(--muted)">All</span>{% endif %}
+      </td>
+      <td>
+        <code>{{ property_labels.get(f.property, f.property) }}</code>
+        {% if f.property != 'X-SOURCE-ID' %}
+          {{ filter_type_labels.get(f.type, f.type) }}
+          <code>{{ f.pattern }}</code>
+        {% else %}
+          = <code>{{ sources_by_id.get(f.pattern|int, f.pattern) }}</code>
+        {% endif %}
+      </td>
+      <td><span class="badge badge-{{ f.action }}">{{ filter_action_labels.get(f.action, f.action) }}</span></td>
+      <td class="row-actions">
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.filter_edit', calendar_slug=cal.slug, filter_id=f.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('ui.filter_delete', calendar_slug=cal.slug, filter_id=f.id) }}" onsubmit="return confirm('Delete this filter?')">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">No filters. <a href="{{ url_for('ui.filter_new', calendar_slug=cal.slug) }}">Add one</a>.</p>
+  {% endif %}
+</section>
+
+{# ── RULES ── #}
+<section class="tab-panel {% if active_tab != 'rules' %}hidden{% endif %}" id="tab-rules">
+  <div class="section-header">
+    <h3>Rules</h3>
+    <a class="btn btn-sm" href="{{ url_for('ui.rule_new', calendar_slug=cal.slug) }}">+ New Rule</a>
+  </div>
+  <p class="hint" style="margin-bottom:.875rem">Rules transform matching events — appending text, replacing fields, etc.</p>
+  {% if rules %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Priority</th><th>Scope</th><th>Condition</th><th>Transform</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rules %}
+    <tr>
+      <td>{{ r.priority }}</td>
+      <td>
+        {% if r.source_id %}Source: <em>{{ sources_by_id.get(r.source_id, r.source_id) }}</em>
+        {% elif r.view_id %}View: <em>{{ views_by_id.get(r.view_id, r.view_id) }}</em>
+        {% else %}<span style="color:var(--muted)">All</span>{% endif %}
+      </td>
+      <td>
+        {% if r.filter_property == '*' %}
+          <span style="color:var(--muted);font-style:italic">All events</span>
+        {% elif r.filter_property == 'X-SOURCE-ID' %}
+          <code>Source ID</code> = <code>{{ sources_by_id.get(r.filter_pattern|int, r.filter_pattern) }}</code>
+        {% else %}
+          <code>{{ property_labels.get(r.filter_property, r.filter_property) }}</code>
+          {{ filter_type_labels.get(r.filter_type, r.filter_type) }}
+          <code>{{ r.filter_pattern }}</code>
+        {% endif %}
+      </td>
+      <td>
+        {{ rule_action_labels.get(r.action, r.action) }}
+        <code>{{ property_labels.get(r.target_property, r.target_property) }}</code>
+        {% if r.action != 'delete' and r.target_value %}&rarr; <code>{{ r.target_value }}</code>{% endif %}
+      </td>
+      <td class="row-actions">
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.rule_edit', calendar_slug=cal.slug, rule_id=r.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('ui.rule_delete', calendar_slug=cal.slug, rule_id=r.id) }}" onsubmit="return confirm('Delete this rule?')">
+          <button class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">No rules. <a href="{{ url_for('ui.rule_new', calendar_slug=cal.slug) }}">Add one</a>.</p>
+  {% endif %}
+</section>
+
+{# ── SHARING ── #}
+<section class="tab-panel {% if active_tab != 'sharing' %}hidden{% endif %}" id="tab-sharing">
+  <form method="post">
+    <input type="hidden" name="_form" value="sharing">
+
+    <div class="form-card">
+      <div class="form-card-title">Sharing Mode</div>
+      <label class="checkbox-label">
+        <input type="checkbox" name="share_ics" {% if cal.share_ics %}checked{% endif %}>
+        Allow ICS subscribe / download
+      </label>
+      {% if cal.share_ics %}
+      <div class="info-box" style="margin-top:.5rem">
+        Feed URL: <code>{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button type="button" class="btn btn-sm btn-ghost" style="margin-left:.25rem" onclick="copyText('{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default', this)">Copy</button>
+      </div>
+      {% endif %}
+      <label class="checkbox-label" style="margin-top:.75rem">
+        <input type="checkbox" name="share_viewer" {% if cal.share_viewer %}checked{% endif %}>
+        Enable public web viewer
+      </label>
+      {% if cal.share_viewer %}
+      <div class="info-box" style="margin-top:.5rem">
+        Viewer URL: <code>{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button type="button" class="btn btn-sm btn-ghost" style="margin-left:.25rem" onclick="copyText('{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default', this)">Copy</button>
+        <a href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" class="btn btn-sm btn-secondary" style="margin-left:.25rem">Open</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">Public Page Appearance</div>
+      <label for="viewer_title">Page Title</label>
+      <input id="viewer_title" name="viewer_title" type="text" value="{{ cal.viewer_title or '' }}" placeholder="{{ cal.title }}">
+      <label for="viewer_description">Message</label>
+      <textarea id="viewer_description" name="viewer_description" rows="2" placeholder="Shown at the top of the public page">{{ cal.viewer_description or '' }}</textarea>
+      <label for="viewer_color">Accent Colour</label>
+      <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem">
+        <input id="viewer_color" name="viewer_color" type="color" value="{{ cal.viewer_color or '#4361ee' }}" style="width:44px;height:34px;padding:2px;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)" oninput="document.getElementById('color-hex').textContent=this.value">
+        <span id="color-hex" style="font-family:ui-monospace,monospace;font-size:.85rem;color:var(--muted)">{{ cal.viewer_color or '#4361ee' }}</span>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">Event Display</div>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_free_busy_only" {% if cal.viewer_free_busy_only %}checked{% endif %}> Show as Free/Busy only (hide event details)</label>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_show_time" {% if cal.viewer_show_time %}checked{% endif %}> Show event time</label>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_show_description" {% if cal.viewer_show_description %}checked{% endif %}> Show event description</label>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_show_location" {% if cal.viewer_show_location %}checked{% endif %}> Show location</label>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">Links on Public Page</div>
+      <p class="hint" style="margin-bottom:.65rem">Add links to booking pages, contact forms, etc.</p>
+      <div id="links-container">
+        {% for link in sharing_links %}
+        <div class="link-row">
+          <input type="text" name="link_label" placeholder="Label" value="{{ link.label }}">
+          <input type="url" name="link_url" placeholder="https://..." value="{{ link.url }}">
+          <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.link-row').remove()">x</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-sm btn-ghost" style="margin-top:.5rem" onclick="addLink()">+ Add Link</button>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">Password Protection</div>
+      {% if cal.viewer_password %}
+      <p class="hint">A password is currently set.</p>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_password_remove"> Remove password</label>
+      <label for="viewer_password_new" style="margin-top:.75rem">Set new password (leave blank to keep current)</label>
+      {% else %}
+      <label for="viewer_password_new">Password (leave blank for no restriction)</label>
+      {% endif %}
+      <input id="viewer_password_new" name="viewer_password_new" type="password" autocomplete="new-password" placeholder="New password">
+    </div>
+
+    <div style="margin-top:1.35rem">
+      <button type="submit" class="btn">Save Sharing Settings</button>
+    </div>
+  </form>
+</section>
+
+{# ── ADVANCED ── #}
+<section class="tab-panel {% if active_tab != 'advanced' %}hidden{% endif %}" id="tab-advanced">
+
+  <form method="post" style="margin-bottom:1.25rem">
+    <input type="hidden" name="_form" value="settings">
+    <div class="form-card">
+      <div class="form-card-title">Default View</div>
+      <label class="checkbox-label">
+        <input type="checkbox" name="default_view_enabled" {% if cal.get('default_view_enabled', 1) %}checked{% endif %}>
+        Enable the default feed/viewer URL (<code>/feed/…/default</code>)
+      </label>
+      <p class="hint" style="margin-top:.4rem">Disable this if you only want named views to be accessible.</p>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">Event Window</div>
+      <p class="hint" style="margin-bottom:.75rem">Controls how far back and forward recurring events are expanded when building the feed. Named views can use their own <code>?start=</code> / <code>?end=</code> query parameters to override.</p>
+      <div class="form-row">
+        <div>
+          <label for="expansion_days_behind">Look behind (days)</label>
+          <input id="expansion_days_behind" name="expansion_days_behind" type="number" min="0" max="3650"
+                 value="{{ cal.get('expansion_days_behind', 0) }}" placeholder="0">
+          <p class="hint">Past events to include (0 = today onwards)</p>
+        </div>
+        <div>
+          <label for="expansion_days_ahead">Look ahead (days)</label>
+          <input id="expansion_days_ahead" name="expansion_days_ahead" type="number" min="1" max="3650"
+                 value="{{ cal.get('expansion_days_ahead', 180) }}" placeholder="180">
+          <p class="hint">Future events to include</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1rem">
+      <button type="submit" class="btn">Save Settings</button>
+    </div>
+  </form>
+
+  <div class="danger-zone">
+    <h3>Delete Calendar</h3>
+    <p>Permanently delete this calendar and all its sources, rules, and filters. This cannot be undone.</p>
+    <form method="post" action="{{ url_for('ui.calendar_delete', calendar_slug=cal.slug) }}" onsubmit="return confirm('Delete this calendar and all its data?')">
+      <button class="btn btn-danger">Delete Calendar</button>
+    </form>
+  </div>
+</section>
+
+<style>
+.src-disabled td:first-child { opacity: .5; }
+.src-disabled code { opacity: .5; }
+</style>
+
+<script>
+const TABS = ['sources','views','filters','rules','sharing','advanced'];
+
+(function() {
+  const active = {{ active_tab | tojson }};
+  TABS.forEach(id => {
+    document.getElementById('tab-' + id).classList.toggle('hidden', id !== active);
+  });
+  document.querySelectorAll('.tab').forEach(t => {
+    const href = t.getAttribute('href');
+    t.classList.toggle('active', href === '?tab=' + active);
+  });
+})();
+
+function showTab(id, el, event) {
+  if (event) event.preventDefault();
+  TABS.forEach(tid => document.getElementById('tab-' + tid).classList.toggle('hidden', tid !== id));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  history.replaceState(null, '', '?tab=' + id);
+}
+
+function copyUrl(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent.trim());
+  if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
+}
+function copyText(t, btn) {
+  navigator.clipboard.writeText(t);
+  if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
+}
+
+function addLink() {
+  const c = document.getElementById('links-container');
+  const row = document.createElement('div');
+  row.className = 'link-row';
+  row.innerHTML = '<input type="text" name="link_label" placeholder="Label"><input type="url" name="link_url" placeholder="https://..."><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.link-row\').remove()">x</button>';
+  c.appendChild(row);
+}
+
+function testSource(id, url) {
+  const el = document.getElementById('test-' + id);
+  el.textContent = 'Testing...';
+  el.style.color = 'var(--muted)';
+  fetch(url, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        el.textContent = data.event_count + ' events';
+        el.style.color = 'var(--success)';
+      } else {
+        el.textContent = 'Error';
+        el.style.color = 'var(--danger)';
+        el.title = data.error;
+      }
+    })
+    .catch(() => { el.textContent = 'Failed'; el.style.color = 'var(--danger)'; });
+}
+</script>
+{% endblock %}

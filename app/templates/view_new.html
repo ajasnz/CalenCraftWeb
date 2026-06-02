@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}New View — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New View for "{{ cal.title }}"</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <label for="title">Title</label>
+    <input id="title" name="title" type="text" required autofocus placeholder="e.g. Work Only">
+    <p class="hint">A URL-friendly slug will be generated automatically.</p>
+    <button type="submit" class="btn">Create View</button>
+  </form>
+</div>
+{% endblock %}

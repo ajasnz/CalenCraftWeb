@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}New Filter — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New Filter for "{{ cal.title }}"</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <div class="form-row">
+      <div>
+        <label for="property">Event Property</label>
+        <select id="property" name="property" required>
+          {% for p in properties %}
+          <option value="{{ p }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="type">Match Type</label>
+        <select id="type" name="type" required>
+          {% for t in filter_types %}
+          <option value="{{ t }}">{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label for="pattern">Pattern</label>
+    <input id="pattern" name="pattern" type="text" required placeholder="e.g. Meeting, .*Conference.*, OOO">
+
+    <div class="form-row">
+      <div>
+        <label for="action">Action</label>
+        <select id="action" name="action">
+          {% for a in filter_actions %}
+          <option value="{{ a }}">{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="priority">Priority</label>
+        <input id="priority" name="priority" type="number" value="100" min="1" max="9999">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label for="source_id">Scope to Source (optional)</label>
+        <select id="source_id" name="source_id">
+          <option value="">All sources</option>
+          {% for s in sources %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="view_id">Scope to View (optional)</label>
+        <select id="view_id" name="view_id">
+          <option value="">All views</option>
+          {% for v in views %}
+          <option value="{{ v.id }}">{{ v.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label class="checkbox-label">
+      <input type="checkbox" name="include_if_fails">
+      Include event if property is absent
+    </label>
+
+    <button type="submit" class="btn">Create Filter</button>
+  </form>
+</div>
+{% endblock %}

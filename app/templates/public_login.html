@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ cfg.viewer_title or 'Calendar' }} — Password Required</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    :root { --primary: {{ cfg.viewer_color or '#4361ee' }}; --primary-dark: {{ cfg.viewer_color or '#4361ee' }}; }
+  </style>
+</head>
+<body>
+<div class="auth-card" style="margin-top:8rem">
+  <h1>{{ cfg.viewer_title or 'Calendar' }}</h1>
+  {% if cfg.viewer_description %}
+  <p class="tagline">{{ cfg.viewer_description }}</p>
+  {% endif %}
+  <p class="tagline">This calendar is password protected.</p>
+  <form method="post">
+    <label for="pub_password">Password</label>
+    <input id="pub_password" name="pub_password" type="password" required autofocus>
+    {% if error %}<p style="color:var(--danger);font-size:.85rem;margin-top:.5rem">Incorrect password.</p>{% endif %}
+    <button type="submit" class="btn" style="width:100%;margin-top:1rem">View Calendar</button>
+  </form>
+</div>
+</body>
+</html>

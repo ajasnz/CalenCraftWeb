@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Edit Source — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Edit Source</h2>
+</div>
+<div class="form-card">
+  <form method="post">
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" value="{{ source.name }}" placeholder="Friendly name" required>
+    <label for="url">ICS URL</label>
+    <input id="url" name="url" type="url" value="{{ source.url }}" required>
+    <p class="hint">Must be a publicly accessible .ics feed URL.</p>
+    <div style="display:flex;gap:.75rem;margin-top:1.35rem">
+      <button type="submit" class="btn">Save</button>
+      <a class="btn btn-ghost" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug, tab='sources') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

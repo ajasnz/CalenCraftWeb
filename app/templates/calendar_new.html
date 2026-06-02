@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}New Calendar — CalenCraft{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New Calendar</h2>
+  <a href="{{ url_for('ui.dashboard') }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <label for="title">Title</label>
+    <input id="title" name="title" type="text" required autofocus placeholder="e.g. Work + Personal">
+    <button type="submit" class="btn">Create Calendar</button>
+  </form>
+</div>
+{% endblock %}

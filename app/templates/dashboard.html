@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CalenCraft{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Your Calendars</h2>
+  <a class="btn" href="{{ url_for('ui.calendar_new') }}">+ New Calendar</a>
+</div>
+
+{% if calendars %}
+<div class="card-grid">
+  {% for cal in calendars %}
+  <div class="card">
+    <h3><a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">{{ cal.title }}</a></h3>
+    <p class="slug">{{ cal.slug }}</p>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">Manage</a>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <p style="font-size:2.5rem;margin-bottom:.75rem">🗓</p>
+  <p style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:.4rem">No calendars yet</p>
+  <p style="max-width:360px;margin:0 auto .25rem">CalenCraft aggregates ICS feeds, applies filters and transformations, and serves a merged calendar your clients can subscribe to.</p>
+  <p style="margin-bottom:1.25rem;color:var(--muted);font-size:.85rem">Create a calendar &rarr; add sources &rarr; subscribe via the feed URL.</p>
+  <a class="btn" href="{{ url_for('ui.calendar_new') }}">Create your first calendar</a>
+</div>
+{% endif %}
+{% endblock %}

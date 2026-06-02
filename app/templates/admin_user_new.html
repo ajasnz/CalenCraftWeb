@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}New User — Admin{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New User</h2>
+  <a href="{{ url_for('ui.admin_users') }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" required autofocus>
+    <label for="display_name">Display Name</label>
+    <input id="display_name" name="display_name" type="text" placeholder="Optional">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" placeholder="Optional">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required>
+    <label class="checkbox-label">
+      <input type="checkbox" name="is_admin"> Administrator
+    </label>
+    <button type="submit" class="btn">Create User</button>
+  </form>
+</div>
+{% endblock %}

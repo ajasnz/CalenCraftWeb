@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Add Source — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Add Source to "{{ cal.title }}"</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <label for="url">iCal URL</label>
+    <input id="url" name="url" type="url" required autofocus placeholder="https://example.com/calendar.ics">
+    <label for="name">Display Name</label>
+    <input id="name" name="name" type="text" placeholder="Optional friendly name">
+    <button type="submit" class="btn">Add Source</button>
+  </form>
+</div>
+{% endblock %}

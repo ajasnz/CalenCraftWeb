@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Log in — CalenCraft{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">🗓</div>
+  <h1>CalenCraft</h1>
+  <p class="tagline">Programmable calendar feeds</p>
+  <form method="post">
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button type="submit" class="btn" style="width:100%;margin-top:1.25rem;justify-content:center">Log in</button>
+  </form>
+</div>
+{% endblock %}

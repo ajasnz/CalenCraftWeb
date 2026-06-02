@@ -1,0 +1,7 @@
+flask>=3.0
+requests>=2.31
+icalendar>=5.0
+recurring-ical-events>=3.0
+regex>=2024.0
+werkzeug>=3.0
+gunicorn>=21.0

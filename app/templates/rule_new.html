@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}New Rule — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New Rule for "{{ cal.title }}"</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back</a>
+</div>
+<div class="form-card">
+  <form method="post">
+    <fieldset>
+      <legend>Condition — when does this rule apply?</legend>
+      <div class="form-row">
+        <div>
+          <label for="filter_property">Event Property</label>
+          <select id="filter_property" name="filter_property" required>
+            {% for p in properties %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="filter_type">Match Type</label>
+          <select id="filter_type" name="filter_type" required>
+            {% for t in filter_types %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <label for="filter_pattern">Pattern</label>
+      <input id="filter_pattern" name="filter_pattern" type="text" required placeholder="e.g. Meeting, .*Conference.*">
+      <div class="form-row">
+        <div>
+          <label for="filter_action">Filter Action</label>
+          <select id="filter_action" name="filter_action">
+            {% for a in filter_actions %}
+            <option value="{{ a }}">{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <label class="checkbox-label">
+        <input type="checkbox" name="include_if_fails">
+        Apply rule if property is absent
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Transformation — what should happen?</legend>
+      <div class="form-row">
+        <div>
+          <label for="target_property">Target Property</label>
+          <select id="target_property" name="target_property" required>
+            {% for p in properties %}
+            <option value="{{ p }}">{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="action">Action</label>
+          <select id="action" name="action" required onchange="toggleValue(this)">
+            {% for a in rule_actions %}
+            <option value="{{ a }}">{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div id="value-row">
+        <label for="target_value">Value</label>
+        <input id="target_value" name="target_value" type="text" placeholder="Text to append, prepend, or replace with">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Scope (optional)</legend>
+      <div class="form-row">
+        <div>
+          <label for="source_id">Source</label>
+          <select id="source_id" name="source_id">
+            <option value="">All sources</option>
+            {% for s in sources %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="view_id">View</label>
+          <select id="view_id" name="view_id">
+            <option value="">All views</option>
+            {% for v in views %}
+            <option value="{{ v.id }}">{{ v.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="priority">Priority</label>
+          <input id="priority" name="priority" type="number" value="100" min="1" max="9999">
+        </div>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="btn">Create Rule</button>
+  </form>
+</div>
+<script>
+function toggleValue(sel) {
+  document.getElementById('value-row').style.display = sel.value === 'delete' ? 'none' : '';
+}
+</script>
+{% endblock %}

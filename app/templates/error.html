@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — CalenCraft{% endblock %}
+{% block content %}
+<div class="empty-state" style="padding:5rem 1rem">
+  <p style="font-size:3rem;margin-bottom:.5rem;opacity:.3">{{ code }}</p>
+  <p style="font-size:1.05rem;font-weight:600;color:var(--text);margin-bottom:.5rem">
+    {% if code == 404 %}Page Not Found
+    {% elif code == 403 %}Access Denied
+    {% else %}Something Went Wrong
+    {% endif %}
+  </p>
+  <p style="color:var(--muted);font-size:.9rem;max-width:340px;margin:0 auto .25rem">{{ message }}</p>
+  {% if session.user_id %}
+  <p style="margin-top:1.25rem"><a class="btn btn-ghost btn-sm" href="{{ url_for('ui.dashboard') }}">Back to Dashboard</a></p>
+  {% else %}
+  <p style="margin-top:1.25rem"><a class="btn btn-ghost btn-sm" href="{{ url_for('auth.login') }}">Log in</a></p>
+  {% endif %}
+</div>
+{% endblock %}

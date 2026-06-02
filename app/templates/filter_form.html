@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ form_title }} — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>{{ form_title }}</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug, tab='filters') }}">Back</a>
+</div>
+
+{% set flt = filter_ or {} %}
+{% set action_url = url_for('ui.filter_edit', calendar_slug=cal.slug, filter_id=filter_.id) if filter_ else url_for('ui.filter_new', calendar_slug=cal.slug) %}
+
+<form method="post" action="{{ action_url }}" class="form-card">
+
+  <div class="form-row">
+    <div>
+      <label for="property">Event property</label>
+      <select id="property" name="property" required onchange="onPropertyChange(this)">
+        {% for p in properties if p != '*' %}
+        <option value="{{ p }}" {% if flt.get('property') == p %}selected{% endif %}>{{ property_labels.get(p, p) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div id="match-type-col">
+      <label for="type">Match type</label>
+      <select id="type" name="type" required>
+        {% for t in filter_types %}
+        <option value="{{ t }}" {% if flt.get('type') == t %}selected{% endif %}>{{ filter_type_labels.get(t, t) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div id="pattern-text-row">
+    <label for="pattern">Pattern</label>
+    <input id="pattern" name="pattern" type="text" required
+           value="{% if flt.get('property') != 'X-SOURCE-ID' %}{{ flt.get('pattern', '') }}{% endif %}"
+           placeholder="e.g. Meeting, .*Conference.*, OOO">
+  </div>
+
+  <div id="pattern-source-row" style="display:none">
+    <label for="pattern_source">Source</label>
+    <select id="pattern_source" name="pattern_source">
+      <option value="">— select a source —</option>
+      {% for s in sources %}
+      <option value="{{ s.id }}" {% if flt.get('property') == 'X-SOURCE-ID' and flt.get('pattern')|string == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-row" style="margin-top:.75rem">
+    <div>
+      <label for="action">Action</label>
+      <select id="action" name="action">
+        {% for a in filter_actions %}
+        <option value="{{ a }}" {% if flt.get('action', 'include') == a %}selected{% endif %}>{{ filter_action_labels.get(a, a) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="priority">Priority</label>
+      <input id="priority" name="priority" type="number" value="{{ flt.get('priority', 100) }}" min="1" max="9999">
+    </div>
+  </div>
+
+  <div class="form-row" style="margin-top:.75rem">
+    <div>
+      <label for="source_id">Limit to source</label>
+      <select id="source_id" name="source_id">
+        <option value="">All sources</option>
+        {% for s in sources %}
+        <option value="{{ s.id }}" {% if flt.get('source_id') == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="view_id">Limit to view</label>
+      <select id="view_id" name="view_id">
+        <option value="">All views</option>
+        {% for v in views %}
+        <option value="{{ v.id }}" {% if flt.get('view_id') == v.id %}selected{% endif %}>{{ v.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <label class="checkbox-label" style="margin-top:.75rem">
+    <input type="checkbox" name="include_if_fails" {% if flt.get('include_if_fails') %}checked{% endif %}>
+    Include event if the property is absent
+  </label>
+
+  <button type="submit" class="btn" style="margin-top:1.25rem">{{ 'Save Changes' if filter_ else 'Create Filter' }}</button>
+</form>
+
+<script>
+function onPropertyChange(sel) {
+  const isSourceId = sel.value === 'X-SOURCE-ID';
+  document.getElementById('pattern-text-row').style.display   = isSourceId ? 'none' : '';
+  document.getElementById('pattern-source-row').style.display = isSourceId ? '' : 'none';
+  document.getElementById('match-type-col').style.display     = isSourceId ? 'none' : '';
+  if (isSourceId) document.getElementById('type').value = 'equals';
+}
+document.querySelector('form').addEventListener('submit', function() {
+  if (document.getElementById('property').value === 'X-SOURCE-ID') {
+    document.getElementById('pattern').value = document.getElementById('pattern_source').value;
+    document.getElementById('pattern').removeAttribute('required');
+    document.getElementById('type').value = 'equals';
+  }
+});
+(function() { onPropertyChange(document.getElementById('property')); })();
+</script>
+{% endblock %}

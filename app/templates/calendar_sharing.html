@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Sharing — {{ cal.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Sharing — {{ cal.title }}</h2>
+  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back to Calendar</a>
+</div>
+
+<form method="post" class="sharing-form">
+
+  <div class="form-card">
+    <h3>Sharing Mode</h3>
+    <label class="checkbox-label">
+      <input type="checkbox" name="share_ics" {% if cal.share_ics %}checked{% endif %}>
+      Allow ICS subscribe / download
+    </label>
+    <p class="hint" style="margin-left:1.5rem">Feed URL: <code>{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code></p>
+
+    <label class="checkbox-label" style="margin-top:.75rem">
+      <input type="checkbox" name="share_viewer" {% if cal.share_viewer %}checked{% endif %}>
+      Enable public web viewer
+    </label>
+    {% if cal.share_viewer %}
+    <p class="hint" style="margin-left:1.5rem">Viewer URL: <code>{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
+      <a href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank">Open ↗</a>
+    </p>
+    {% endif %}
+  </div>
+
+  <div class="form-card" style="margin-top:1rem">
+    <h3>Public Page Appearance</h3>
+
+    <label for="viewer_title">Page Title</label>
+    <input id="viewer_title" name="viewer_title" type="text"
+           value="{{ cal.viewer_title or '' }}"
+           placeholder="{{ cal.title }}">
+
+    <label for="viewer_description">Message / Description</label>
+    <textarea id="viewer_description" name="viewer_description" rows="3"
+              placeholder="Shown at the top of the public page">{{ cal.viewer_description or '' }}</textarea>
+
+    <label for="viewer_color">Accent Colour</label>
+    <div style="display:flex;gap:.75rem;align-items:center;margin-top:.3rem">
+      <input id="viewer_color" name="viewer_color" type="color"
+             value="{{ cal.viewer_color or '#4361ee' }}" style="width:48px;height:36px;padding:2px;border-radius:4px;cursor:pointer">
+      <span id="color-hex" style="font-family:monospace;font-size:.875rem">{{ cal.viewer_color or '#4361ee' }}</span>
+    </div>
+  </div>
+
+  <div class="form-card" style="margin-top:1rem">
+    <h3>Event Display</h3>
+    <label class="checkbox-label">
+      <input type="checkbox" name="viewer_free_busy_only" {% if cal.viewer_free_busy_only %}checked{% endif %}>
+      Show as Free/Busy only (hide event titles and details)
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="viewer_show_time" {% if cal.viewer_show_time %}checked{% endif %}>
+      Show event time
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="viewer_show_description" {% if cal.viewer_show_description %}checked{% endif %}>
+      Show event description
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="viewer_show_location" {% if cal.viewer_show_location %}checked{% endif %}>
+      Show event location
+    </label>
+  </div>
+
+  <div class="form-card" style="margin-top:1rem">
+    <h3>Links</h3>
+    <p class="hint" style="margin-bottom:.75rem">Add links shown on the public page (e.g. a booking or contact page).</p>
+    <div id="links-container">
+      {% for link in links %}
+      <div class="link-row">
+        <input type="text" name="link_label" placeholder="Label (e.g. Book a meeting)" value="{{ link.label }}">
+        <input type="url" name="link_url" placeholder="https://..." value="{{ link.url }}">
+        <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.link-row').remove()">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm btn-secondary" style="margin-top:.5rem" onclick="addLink()">+ Add Link</button>
+  </div>
+
+  <div class="form-card" style="margin-top:1rem">
+    <h3>Password Protection</h3>
+    {% if cal.viewer_password %}
+    <p class="hint">A password is currently set.</p>
+    <label class="checkbox-label">
+      <input type="checkbox" name="viewer_password_remove"> Remove password
+    </label>
+    <label for="viewer_password_new" style="margin-top:.75rem">Set a new password (leave blank to keep current)</label>
+    {% else %}
+    <label for="viewer_password_new">Password (optional — leave blank for no password)</label>
+    {% endif %}
+    <input id="viewer_password_new" name="viewer_password_new" type="password"
+           autocomplete="new-password" placeholder="New password">
+  </div>
+
+  <div style="margin-top:1.25rem">
+    <button type="submit" class="btn">Save Settings</button>
+  </div>
+</form>
+
+<style>
+.sharing-form .form-card h3 { font-size:.95rem; margin-bottom:.75rem; color: var(--muted); text-transform:uppercase; letter-spacing:.04em; font-size:.75rem; }
+.link-row { display:flex; gap:.5rem; margin-bottom:.5rem; }
+.link-row input { flex:1; margin-top:0; }
+textarea { width:100%; padding:.5rem .7rem; border:1px solid var(--border); border-radius:var(--radius); font-size:.9rem; font-family:inherit; resize:vertical; }
+</style>
+
+<script>
+document.getElementById('viewer_color').addEventListener('input', function() {
+  document.getElementById('color-hex').textContent = this.value;
+});
+function addLink() {
+  const c = document.getElementById('links-container');
+  const row = document.createElement('div');
+  row.className = 'link-row';
+  row.innerHTML = `<input type="text" name="link_label" placeholder="Label (e.g. Book a meeting)">
+    <input type="url" name="link_url" placeholder="https://...">
+    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.link-row').remove()">✕</button>`;
+  c.appendChild(row);
+}
+</script>
+{% endblock %}
