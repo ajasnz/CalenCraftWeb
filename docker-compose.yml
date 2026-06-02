@@ -1,0 +1,12 @@
+services:
+  calencraft:
+    image: calencraft:latest
+    container_name: calencraft
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SECRET_KEY: ""
+      WEB_CONCURRENCY: 2
+    volumes:
+      - ./data:/data
