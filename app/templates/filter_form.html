@@ -30,19 +30,37 @@
     </div>
   </div>
 
+  {# Text pattern (default) #}
   <div id="pattern-text-row">
     <label for="pattern">Pattern</label>
     <input id="pattern" name="pattern" type="text" required
-           value="{% if flt.get('property') != 'X-SOURCE-ID' %}{{ flt.get('pattern', '') }}{% endif %}"
+           value="{% if flt.get('property') not in ('X-SOURCE-ID',) + property_enum_values.keys()|list %}{{ flt.get('pattern', '') }}{% endif %}"
            placeholder="e.g. Meeting, .*Conference.*, OOO">
   </div>
 
+  {# Source picker — X-SOURCE-ID #}
   <div id="pattern-source-row" style="display:none">
     <label for="pattern_source">Source</label>
     <select id="pattern_source" name="pattern_source">
       <option value="">— select a source —</option>
       {% for s in sources %}
       <option value="{{ s.id }}" {% if flt.get('property') == 'X-SOURCE-ID' and flt.get('pattern')|string == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Enum value picker — TRANSP, STATUS, etc. #}
+  <div id="pattern-enum-row" style="display:none">
+    <label for="pattern_enum">Value</label>
+    <select id="pattern_enum" name="pattern_enum">
+      <option value="">— select —</option>
+      {% for prop, opts in property_enum_values.items() %}
+      {% for val, label in opts %}
+      <option value="{{ val }}" data-prop="{{ prop }}"
+              {% if flt.get('property') == prop and flt.get('pattern') == val %}selected{% endif %}>
+        {{ label }}
+      </option>
+      {% endfor %}
       {% endfor %}
     </select>
   </div>
@@ -92,20 +110,44 @@
 </form>
 
 <script>
-function onPropertyChange(sel) {
-  const isSourceId = sel.value === 'X-SOURCE-ID';
-  document.getElementById('pattern-text-row').style.display   = isSourceId ? 'none' : '';
-  document.getElementById('pattern-source-row').style.display = isSourceId ? '' : 'none';
-  document.getElementById('match-type-col').style.display     = isSourceId ? 'none' : '';
-  if (isSourceId) document.getElementById('type').value = 'equals';
+const ENUM_PROPS = {{ property_enum_values | tojson }};
+
+function refreshEnumSelect(selectEl, prop, currentVal) {
+  while (selectEl.options.length > 1) selectEl.remove(1);
+  (ENUM_PROPS[prop] || []).forEach(([val, label]) => {
+    const o = new Option(label, val);
+    if (val === currentVal) o.selected = true;
+    selectEl.add(o);
+  });
 }
+
+function onPropertyChange(sel) {
+  const v = sel.value;
+  const isSourceId = v === 'X-SOURCE-ID';
+  const isEnum     = v in ENUM_PROPS;
+
+  document.getElementById('pattern-text-row').style.display   = (!isSourceId && !isEnum) ? '' : 'none';
+  document.getElementById('pattern-source-row').style.display = isSourceId ? '' : 'none';
+  document.getElementById('pattern-enum-row').style.display   = isEnum ? '' : 'none';
+  document.getElementById('match-type-col').style.display     = (isSourceId || isEnum) ? 'none' : '';
+
+  if (isSourceId || isEnum) document.getElementById('type').value = 'equals';
+  if (isEnum) refreshEnumSelect(document.getElementById('pattern_enum'), v, '');
+}
+
 document.querySelector('form').addEventListener('submit', function() {
-  if (document.getElementById('property').value === 'X-SOURCE-ID') {
+  const prop = document.getElementById('property').value;
+  if (prop === 'X-SOURCE-ID') {
     document.getElementById('pattern').value = document.getElementById('pattern_source').value;
+    document.getElementById('pattern').removeAttribute('required');
+    document.getElementById('type').value = 'equals';
+  } else if (prop in ENUM_PROPS) {
+    document.getElementById('pattern').value = document.getElementById('pattern_enum').value;
     document.getElementById('pattern').removeAttribute('required');
     document.getElementById('type').value = 'equals';
   }
 });
+
 (function() { onPropertyChange(document.getElementById('property')); })();
 </script>
 {% endblock %}

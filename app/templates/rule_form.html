@@ -16,7 +16,7 @@
     <div class="form-row">
       <div>
         <label for="filter_property">Event property</label>
-        <select id="filter_property" name="filter_property" required onchange="onPropertyChange(this)">
+        <select id="filter_property" name="filter_property" required onchange="onFilterPropChange(this)">
           {% for p in properties %}
           <option value="{{ p }}" {% if r.get('filter_property') == p %}selected{% endif %}>{{ property_labels.get(p, p) }}</option>
           {% endfor %}
@@ -32,7 +32,7 @@
       </div>
     </div>
 
-    {# Text pattern — hidden for X-SOURCE-ID and "All events" #}
+    {# Text pattern (default) #}
     <div id="pattern-text-row">
       <label for="filter_pattern">Pattern</label>
       <input id="filter_pattern" name="filter_pattern" type="text"
@@ -40,13 +40,30 @@
              placeholder="e.g. Meeting, .*Conference.*">
     </div>
 
-    {# Source picker — shown only when X-SOURCE-ID #}
+    {# Source picker — X-SOURCE-ID #}
     <div id="pattern-source-row" style="display:none">
       <label for="filter_pattern_source">Source</label>
       <select id="filter_pattern_source" name="filter_pattern_source">
         <option value="">— select a source —</option>
         {% for s in sources %}
         <option value="{{ s.id }}" {% if r.get('filter_property') == 'X-SOURCE-ID' and r.get('filter_pattern')|string == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {# Enum value picker — TRANSP, STATUS, X-MICROSOFT-CDO-BUSYSTATUS #}
+    <div id="pattern-enum-row" style="display:none">
+      <label for="filter_pattern_enum">Value</label>
+      <select id="filter_pattern_enum" name="filter_pattern_enum">
+        <option value="">— select —</option>
+        {# Options populated by JS based on selected property #}
+        {% for prop, opts in property_enum_values.items() %}
+        {% for val, label in opts %}
+        <option value="{{ val }}" data-prop="{{ prop }}"
+                {% if r.get('filter_property') == prop and r.get('filter_pattern') == val %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
         {% endfor %}
       </select>
     </div>
@@ -70,7 +87,7 @@
     <div class="form-row">
       <div>
         <label for="target_property">Property to modify</label>
-        <select id="target_property" name="target_property" required>
+        <select id="target_property" name="target_property" required onchange="onTargetPropChange(this)">
           {% for p in properties if p not in ('*', 'X-SOURCE-ID') %}
           <option value="{{ p }}" {% if r.get('target_property') == p %}selected{% endif %}>{{ property_labels.get(p, p) }}</option>
           {% endfor %}
@@ -78,7 +95,7 @@
       </div>
       <div>
         <label for="action">Action</label>
-        <select id="action" name="action" required onchange="toggleValueRow(this)">
+        <select id="action" name="action" required onchange="onActionChange(this)">
           {% for a in rule_actions %}
           <option value="{{ a }}" {% if r.get('action') == a %}selected{% endif %}>{{ rule_action_labels.get(a, a) }}</option>
           {% endfor %}
@@ -86,8 +103,28 @@
       </div>
     </div>
     <div id="value-row" {% if r.get('action') == 'delete' %}style="display:none"{% endif %}>
-      <label for="target_value">Value</label>
-      <input id="target_value" name="target_value" type="text" value="{{ r.get('target_value', '') }}" placeholder="Text to append, prepend, or replace with">
+      {# Text value (default) #}
+      <div id="target-value-text-wrap">
+        <label for="target_value">Value</label>
+        <input id="target_value" name="target_value" type="text"
+               value="{{ r.get('target_value', '') }}"
+               placeholder="Text to append, prepend, or replace with">
+      </div>
+      {# Enum value picker — shown for replace action on enum properties #}
+      <div id="target-value-enum-wrap" style="display:none">
+        <label for="target_value_enum">Value</label>
+        <select id="target_value_enum" name="target_value_enum">
+          <option value="">— select —</option>
+          {% for prop, opts in property_enum_values.items() %}
+          {% for val, label in opts %}
+          <option value="{{ val }}" data-prop="{{ prop }}"
+                  {% if r.get('target_property') == prop and r.get('target_value') == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+          {% endfor %}
+          {% endfor %}
+        </select>
+      </div>
     </div>
   </fieldset>
 
@@ -123,32 +160,86 @@
 </form>
 
 <script>
-function toggleValueRow(sel) {
-  document.getElementById('value-row').style.display = sel.value === 'delete' ? 'none' : '';
+// Properties that have a fixed set of values
+const ENUM_PROPS = {{ property_enum_values | tojson }};
+
+function getEnumOpts(prop) {
+  return (ENUM_PROPS[prop] || []);   // [[val, label], ...]
 }
 
-function onPropertyChange(sel) {
+function refreshEnumSelect(selectEl, prop, currentVal) {
+  // Remove all options except placeholder
+  while (selectEl.options.length > 1) selectEl.remove(1);
+  const opts = getEnumOpts(prop);
+  opts.forEach(([val, label]) => {
+    const o = new Option(label, val);
+    if (val === currentVal) o.selected = true;
+    selectEl.add(o);
+  });
+}
+
+function onFilterPropChange(sel) {
   const v = sel.value;
   const isSourceId = v === 'X-SOURCE-ID';
   const isAll      = v === '*';
+  const isEnum     = v in ENUM_PROPS;
 
-  document.getElementById('pattern-text-row').style.display   = (isSourceId || isAll) ? 'none' : '';
+  document.getElementById('pattern-text-row').style.display   = (!isSourceId && !isAll && !isEnum) ? '' : 'none';
   document.getElementById('pattern-source-row').style.display = isSourceId ? '' : 'none';
-  document.getElementById('match-type-col').style.display     = (isSourceId || isAll) ? 'none' : '';
+  document.getElementById('pattern-enum-row').style.display   = isEnum ? '' : 'none';
+  document.getElementById('match-type-col').style.display     = (isSourceId || isAll || isEnum) ? 'none' : '';
   document.getElementById('apply-when-row').style.display     = isAll ? 'none' : '';
 
-  if (isSourceId) document.getElementById('filter_type').value = 'equals';
+  if (isSourceId || isEnum) document.getElementById('filter_type').value = 'equals';
+
+  if (isEnum) {
+    refreshEnumSelect(document.getElementById('filter_pattern_enum'), v, '');
+  }
 }
 
-// On submit: if X-SOURCE-ID, copy source picker value into hidden pattern field
+function onTargetPropChange(sel) {
+  updateTargetValueDisplay();
+}
+
+function onActionChange(sel) {
+  document.getElementById('value-row').style.display = sel.value === 'delete' ? 'none' : '';
+  updateTargetValueDisplay();
+}
+
+function updateTargetValueDisplay() {
+  const prop   = document.getElementById('target_property').value;
+  const action = document.getElementById('action').value;
+  const isEnum = (prop in ENUM_PROPS) && action === 'replace';
+
+  document.getElementById('target-value-text-wrap').style.display = isEnum ? 'none' : '';
+  document.getElementById('target-value-enum-wrap').style.display = isEnum ? '' : 'none';
+
+  if (isEnum) {
+    refreshEnumSelect(document.getElementById('target_value_enum'), prop,
+                      document.getElementById('target_value').value);
+  }
+}
+
+// On submit: copy active picker values into the canonical hidden fields
 document.querySelector('form').addEventListener('submit', function() {
-  const prop = document.getElementById('filter_property').value;
-  if (prop === 'X-SOURCE-ID') {
+  const fp = document.getElementById('filter_property').value;
+  if (fp === 'X-SOURCE-ID') {
     document.getElementById('filter_pattern').value = document.getElementById('filter_pattern_source').value;
+  } else if (fp in ENUM_PROPS) {
+    document.getElementById('filter_pattern').value = document.getElementById('filter_pattern_enum').value;
+    document.getElementById('filter_type').value = 'equals';
+  }
+  const tp     = document.getElementById('target_property').value;
+  const action = document.getElementById('action').value;
+  if ((tp in ENUM_PROPS) && action === 'replace') {
+    document.getElementById('target_value').value = document.getElementById('target_value_enum').value;
   }
 });
 
 // Initialise on load
-(function() { onPropertyChange(document.getElementById('filter_property')); })();
+(function() {
+  onFilterPropChange(document.getElementById('filter_property'));
+  updateTargetValueDisplay();
+})();
 </script>
 {% endblock %}

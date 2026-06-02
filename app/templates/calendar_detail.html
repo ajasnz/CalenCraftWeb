@@ -122,13 +122,17 @@
         {% else %}<span style="color:var(--muted)">All</span>{% endif %}
       </td>
       <td>
-        <code>{{ property_labels.get(f.property, f.property) }}</code>
-        {% if f.property != 'X-SOURCE-ID' %}
+        {% set _fpat = enum_value_labels.get(f.property, {}).get(f.pattern, f.pattern) %}
+        {% if f.property == 'X-SOURCE-ID' %}
+          <code>Source ID</code> = <code>{{ sources_by_id.get(f.pattern|int, f.pattern) }}</code>
+        {% elif enum_value_labels.get(f.property) %}
+          <code>{{ property_labels.get(f.property, f.property) }}</code> = <code>{{ _fpat }}</code>
+        {% else %}
+          <code>{{ property_labels.get(f.property, f.property) }}</code>
           {{ filter_type_labels.get(f.type, f.type) }}
           <code>{{ f.pattern }}</code>
-        {% else %}
-          = <code>{{ sources_by_id.get(f.pattern|int, f.pattern) }}</code>
         {% endif %}
+        {% if f.include_if_fails %}<span class="cond-note" title="Also applies if the property is absent">+ if absent</span>{% endif %}
       </td>
       <td><span class="badge badge-{{ f.action }}">{{ filter_action_labels.get(f.action, f.action) }}</span></td>
       <td class="row-actions">
@@ -151,49 +155,107 @@
 <section class="tab-panel {% if active_tab != 'rules' %}hidden{% endif %}" id="tab-rules">
   <div class="section-header">
     <h3>Rules</h3>
-    <a class="btn btn-sm" href="{{ url_for('ui.rule_new', calendar_slug=cal.slug) }}">+ New Rule</a>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      {% if rules and views %}
+      <button class="btn btn-sm btn-ghost" id="rules-group-btn" onclick="toggleRuleGrouping()">Group by view</button>
+      {% endif %}
+      <a class="btn btn-sm" href="{{ url_for('ui.rule_new', calendar_slug=cal.slug) }}">+ New Rule</a>
+    </div>
   </div>
   <p class="hint" style="margin-bottom:.875rem">Rules transform matching events — appending text, replacing fields, etc.</p>
-  {% if rules %}
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Priority</th><th>Scope</th><th>Condition</th><th>Transform</th><th></th></tr></thead>
-    <tbody>
-    {% for r in rules %}
-    <tr>
-      <td>{{ r.priority }}</td>
-      <td>
-        {% if r.source_id %}Source: <em>{{ sources_by_id.get(r.source_id, r.source_id) }}</em>
-        {% elif r.view_id %}View: <em>{{ views_by_id.get(r.view_id, r.view_id) }}</em>
-        {% else %}<span style="color:var(--muted)">All</span>{% endif %}
-      </td>
-      <td>
-        {% if r.filter_property == '*' %}
-          <span style="color:var(--muted);font-style:italic">All events</span>
-        {% elif r.filter_property == 'X-SOURCE-ID' %}
+
+  {% macro rule_row(r) %}
+  <tr>
+    <td>{{ r.priority }}</td>
+    <td>
+      {% if r.source_id %}Source: <em>{{ sources_by_id.get(r.source_id, r.source_id) }}</em>
+      {% elif r.view_id %}View: <em>{{ views_by_id.get(r.view_id, r.view_id) }}</em>
+      {% else %}<span style="color:var(--muted)">All</span>{% endif %}
+    </td>
+    <td>
+      {% if r.filter_property == '*' %}
+        <span style="color:var(--muted);font-style:italic">All events</span>
+      {% else %}
+        {% if r.filter_action == 'exclude' %}<span class="badge badge-not" title="Applies when condition does NOT match">NOT</span> {% endif %}
+        {% if r.filter_property == 'X-SOURCE-ID' %}
           <code>Source ID</code> = <code>{{ sources_by_id.get(r.filter_pattern|int, r.filter_pattern) }}</code>
+        {% elif enum_value_labels.get(r.filter_property) %}
+          <code>{{ property_labels.get(r.filter_property, r.filter_property) }}</code> =
+          <code>{{ enum_value_labels.get(r.filter_property, {}).get(r.filter_pattern, r.filter_pattern) }}</code>
         {% else %}
           <code>{{ property_labels.get(r.filter_property, r.filter_property) }}</code>
           {{ filter_type_labels.get(r.filter_type, r.filter_type) }}
           <code>{{ r.filter_pattern }}</code>
         {% endif %}
-      </td>
-      <td>
-        {{ rule_action_labels.get(r.action, r.action) }}
-        <code>{{ property_labels.get(r.target_property, r.target_property) }}</code>
-        {% if r.action != 'delete' and r.target_value %}&rarr; <code>{{ r.target_value }}</code>{% endif %}
-      </td>
-      <td class="row-actions">
-        <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.rule_edit', calendar_slug=cal.slug, rule_id=r.id) }}">Edit</a>
-        <form method="post" action="{{ url_for('ui.rule_delete', calendar_slug=cal.slug, rule_id=r.id) }}" onsubmit="return confirm('Delete this rule?')">
-          <button class="btn btn-sm btn-danger">Delete</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
+        {% if r.include_if_fails %}<span class="cond-note" title="Also applies if the property is absent">+ if absent</span>{% endif %}
+      {% endif %}
+    </td>
+    <td>
+      {% set _prop = property_labels.get(r.target_property, r.target_property) %}
+      {% set _val  = enum_value_labels.get(r.target_property, {}).get(r.target_value, r.target_value) %}
+      {% if r.action == 'replace' %}
+        Replace <code>{{ _prop }}</code> with <code>{{ _val }}</code>
+      {% elif r.action == 'append' %}
+        Append <code>{{ _val }}</code> to <code>{{ _prop }}</code>
+      {% elif r.action == 'prepend' %}
+        Prepend <code>{{ _val }}</code> to <code>{{ _prop }}</code>
+      {% elif r.action == 'delete' %}
+        Delete <code>{{ _prop }}</code>
+      {% else %}
+        {{ rule_action_labels.get(r.action, r.action) }} <code>{{ _prop }}</code>
+        {% if r.target_value %}&rarr; <code>{{ _val }}</code>{% endif %}
+      {% endif %}
+    </td>
+    <td class="row-actions">
+      <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.rule_edit', calendar_slug=cal.slug, rule_id=r.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('ui.rule_delete', calendar_slug=cal.slug, rule_id=r.id) }}" onsubmit="return confirm('Delete this rule?')">
+        <button class="btn btn-sm btn-danger">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endmacro %}
+
+  {% macro rule_table(rule_list) %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Priority</th><th>Scope</th><th>Condition</th><th>Transform</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rule_list %}{{ rule_row(r) }}{% endfor %}
     </tbody>
   </table>
   </div>
+  {% endmacro %}
+
+  {% if rules %}
+
+  {# ── Flat view (default) ── #}
+  <div id="rules-flat">
+    {{ rule_table(rules) }}
+  </div>
+
+  {# ── Grouped by view ── #}
+  <div id="rules-grouped" style="display:none">
+    {% set rules_no_view = rules | selectattr('view_id', 'none') | list %}
+    {% if rules_no_view %}
+    <div class="rule-group">
+      <div class="rule-group-header">All views</div>
+      {{ rule_table(rules_no_view) }}
+    </div>
+    {% endif %}
+    {% for v in views %}
+    {% set view_rules = rules | selectattr('view_id', 'equalto', v.id) | list %}
+    {% if view_rules %}
+    <div class="rule-group">
+      <div class="rule-group-header">{{ v.title }}</div>
+      {{ rule_table(view_rules) }}
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% set known_view_ids = views | map(attribute='id') | list %}
+    {% set orphan_rules = rules | rejectattr('view_id', 'none') | selectattr('view_id') | list %}
+    {# Note: rules with view_ids not in views list are shown in flat view only #}
+  </div>
+
   {% else %}
   <p class="empty">No rules. <a href="{{ url_for('ui.rule_new', calendar_slug=cal.slug) }}">Add one</a>.</p>
   {% endif %}
@@ -333,6 +395,35 @@
 <style>
 .src-disabled td:first-child { opacity: .5; }
 .src-disabled code { opacity: .5; }
+
+.badge-not {
+  display: inline-flex; align-items: center;
+  padding: .15em .5em; border-radius: 99px;
+  font-size: .68rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  background: var(--warning-bg); color: var(--warning);
+  border: 1px solid #fde68a; vertical-align: middle;
+  margin-right: .15em;
+}
+.cond-note {
+  font-size: .72rem; color: var(--muted-light);
+  margin-left: .35em; font-style: italic;
+  cursor: help; vertical-align: middle;
+}
+.rule-group { margin-bottom: 1.25rem; }
+.rule-group-header {
+  font-size: .75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--muted);
+  padding: .35rem .5rem; margin-bottom: .4rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.rule-group-header::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+#rules-group-btn.active {
+  background: var(--primary-bg); color: var(--primary);
+  border-color: #c7d2fe;
+}
 </style>
 
 <script>
@@ -373,6 +464,28 @@ function addLink() {
   row.innerHTML = '<input type="text" name="link_label" placeholder="Label"><input type="url" name="link_url" placeholder="https://..."><button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.link-row\').remove()">x</button>';
   c.appendChild(row);
 }
+
+// Rule grouping toggle — persisted in localStorage per calendar
+const RULE_GROUP_KEY = 'rules_grouped_{{ cal.slug }}';
+function toggleRuleGrouping() {
+  const grouped = localStorage.getItem(RULE_GROUP_KEY) === '1';
+  setRuleGrouping(!grouped);
+}
+function setRuleGrouping(grouped) {
+  const flat    = document.getElementById('rules-flat');
+  const grp     = document.getElementById('rules-grouped');
+  const btn     = document.getElementById('rules-group-btn');
+  if (!flat || !grp) return;
+  flat.style.display = grouped ? 'none' : '';
+  grp.style.display  = grouped ? '' : 'none';
+  if (btn) {
+    btn.textContent = grouped ? 'Show flat list' : 'Group by view';
+    btn.classList.toggle('active', grouped);
+  }
+  localStorage.setItem(RULE_GROUP_KEY, grouped ? '1' : '0');
+}
+// Restore preference on load
+(function() { setRuleGrouping(localStorage.getItem(RULE_GROUP_KEY) === '1'); })();
 
 function testSource(id, url) {
   const el = document.getElementById('test-' + id);

@@ -61,13 +61,35 @@ ui_bp = Blueprint("ui", __name__)
 # ------------------------------------------------------------------
 
 PROPERTY_LABELS = {
-    "*":           "All events",
-    "SUMMARY":     "Event Title",
-    "DESCRIPTION": "Description",
-    "LOCATION":    "Location",
-    "CATEGORIES":  "Categories",
-    "STATUS":      "Status",
-    "X-SOURCE-ID": "Source ID",
+    "*":                          "All events",
+    "SUMMARY":                    "Event Title",
+    "DESCRIPTION":                "Description",
+    "LOCATION":                   "Location",
+    "CATEGORIES":                 "Categories",
+    "STATUS":                     "Event Status",
+    "TRANSP":                     "Free/Busy",
+    "X-MICROSOFT-CDO-BUSYSTATUS": "Busy Status (Outlook)",
+    "X-SOURCE-ID":                "Source ID",
+}
+
+# Properties whose values are a fixed set — shown as a dropdown in forms
+PROPERTY_ENUM_VALUES = {
+    "STATUS": [
+        ("CONFIRMED",  "Confirmed"),
+        ("TENTATIVE",  "Tentative"),
+        ("CANCELLED",  "Cancelled"),
+    ],
+    "TRANSP": [
+        ("OPAQUE",       "Busy (Opaque)"),
+        ("TRANSPARENT",  "Free (Transparent)"),
+    ],
+    "X-MICROSOFT-CDO-BUSYSTATUS": [
+        ("FREE",             "Free"),
+        ("BUSY",             "Busy"),
+        ("TENTATIVE",        "Tentative"),
+        ("OOF",              "Out of Office"),
+        ("WORKINGELSEWHERE", "Working Elsewhere"),
+    ],
 }
 FILTER_TYPE_LABELS = {
     "contains":       "Contains",
@@ -82,10 +104,10 @@ FILTER_TYPE_LABELS = {
     "not_regex":      "Does not match regex",
 }
 RULE_ACTION_LABELS = {
-    "append":  "Append text",
-    "prepend": "Prepend text",
-    "replace": "Replace with",
-    "delete":  "Delete property",
+    "append":  "Append",
+    "prepend": "Prepend",
+    "replace": "Replace",
+    "delete":  "Delete",
 }
 APPLY_WHEN_LABELS = {
     "include": "When event matches",
@@ -94,6 +116,12 @@ APPLY_WHEN_LABELS = {
 FILTER_ACTION_LABELS = {
     "include": "Include matching events",
     "exclude": "Exclude matching events",
+}
+
+# Flat lookup: {property: {raw_value: human_label}} — used in table display
+ENUM_VALUE_LABELS = {
+    prop: {val: label for val, label in opts}
+    for prop, opts in PROPERTY_ENUM_VALUES.items()
 }
 
 COMMON_PROPERTIES = list(PROPERTY_LABELS.keys())
@@ -135,6 +163,8 @@ def _label_maps():
         rule_action_labels=RULE_ACTION_LABELS,
         apply_when_labels=APPLY_WHEN_LABELS,
         filter_action_labels=FILTER_ACTION_LABELS,
+        property_enum_values=PROPERTY_ENUM_VALUES,
+        enum_value_labels=ENUM_VALUE_LABELS,
     )
 
 
@@ -425,17 +455,26 @@ def view_delete(calendar_slug, view_id):
 
 def _rule_form_data(f):
     filter_property = f.get("filter_property", "")
-    # X-SOURCE-ID uses a source picker; pattern comes from filter_pattern_source
     if filter_property == "X-SOURCE-ID":
         filter_pattern = f.get("filter_pattern_source") or f.get("filter_pattern", "")
         filter_type = "equals"
     elif filter_property == "*":
-        # "All events" — no condition needed
         filter_pattern = ""
+        filter_type = "equals"
+    elif filter_property in PROPERTY_ENUM_VALUES:
+        filter_pattern = f.get("filter_pattern_enum") or f.get("filter_pattern", "")
         filter_type = "equals"
     else:
         filter_pattern = f.get("filter_pattern", "")
         filter_type = f.get("filter_type", "")
+
+    target_property = f.get("target_property", "")
+    action = f.get("action", "")
+    if target_property in PROPERTY_ENUM_VALUES and action == "replace":
+        target_value = f.get("target_value_enum") or f.get("target_value", "")
+    else:
+        target_value = f.get("target_value", "")
+
     return dict(
         view_id=f.get("view_id") or None,
         source_id=f.get("source_id") or None,
@@ -445,9 +484,9 @@ def _rule_form_data(f):
         filter_pattern=filter_pattern,
         filter_action=f.get("filter_action", "include"),
         include_if_fails=1 if f.get("include_if_fails") else 0,
-        target_property=f.get("target_property", ""),
-        action=f.get("action", ""),
-        target_value=f.get("target_value", ""),
+        target_property=target_property,
+        action=action,
+        target_value=target_value,
     )
 
 
@@ -526,6 +565,9 @@ def _filter_form_data(f):
     property_ = f.get("property", "")
     if property_ == "X-SOURCE-ID":
         pattern = f.get("pattern_source") or f.get("pattern", "")
+        type_ = "equals"
+    elif property_ in PROPERTY_ENUM_VALUES:
+        pattern = f.get("pattern_enum") or f.get("pattern", "")
         type_ = "equals"
     else:
         pattern = f.get("pattern", "")
