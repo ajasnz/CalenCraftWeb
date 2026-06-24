@@ -105,10 +105,10 @@ def create_app():
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://uicdn.toast.com; "
+            "font-src 'self' https://fonts.gstatic.com https://uicdn.toast.com; "
             "img-src 'self' data:; "
-            "script-src 'self' 'unsafe-inline';"
+            "script-src 'self' 'unsafe-inline' https://uicdn.toast.com;"
         )
         return response
 

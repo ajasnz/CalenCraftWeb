@@ -280,6 +280,7 @@ def calendar_detail(calendar_slug):
             viewer_show_time=1 if f.get("viewer_show_time") else 0,
             viewer_show_description=1 if f.get("viewer_show_description") else 0,
             viewer_show_location=1 if f.get("viewer_show_location") else 0,
+            viewer_hide_private=1 if f.get("viewer_hide_private") else 0,
         )
         flash("Sharing settings saved.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing"))

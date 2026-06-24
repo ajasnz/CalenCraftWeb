@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, Response, request, abort
 from app.classes.calendar import CalendarBuilder
 from app.functions import cache as feed_cache
-import datetime
+import datetime, hashlib
 
 feed_bp = Blueprint("feed", __name__)
 
@@ -47,11 +47,16 @@ def serve_feed(user_slug, calendar_slug, view_slug):
     cache_key = f"feed:{user_slug}:{calendar_slug}:{view_slug}:{start_str}:{end_str}"
     cached = feed_cache.get(cache_key)
     if cached is not None:
+        etag = hashlib.md5(cached).hexdigest()
+        if request.headers.get("If-None-Match") == etag:
+            return Response(status=304)
         return Response(
             cached,
             mimetype="text/calendar",
             headers={
                 "Content-Disposition": f'attachment; filename="{calendar_slug}.ics"',
+                "ETag": etag,
+                "Cache-Control": "private, max-age=300",
                 "X-Cache": "HIT",
             },
         )
@@ -68,12 +73,15 @@ def serve_feed(user_slug, calendar_slug, view_slug):
     )
 
     feed_cache.set(cache_key, ical_bytes)
+    etag = hashlib.md5(ical_bytes).hexdigest()
 
     return Response(
         ical_bytes,
         mimetype="text/calendar",
         headers={
             "Content-Disposition": f'attachment; filename="{calendar_slug}.ics"',
+            "ETag": etag,
+            "Cache-Control": "private, max-age=300",
             "X-Cache": "MISS",
         },
     )

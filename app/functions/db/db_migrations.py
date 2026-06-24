@@ -128,4 +128,19 @@ migrations = {
             ALTER TABLE calendars ADD COLUMN default_view_enabled INTEGER NOT NULL DEFAULT 1;
         """,
     },
+    3: {
+        "id": 3,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Source fetch health and private-event hiding",
+        "description": "Track last fetch status per source; add viewer_hide_private sharing option.",
+        "sql": """
+            ALTER TABLE sources ADD COLUMN last_fetch_at TEXT;
+            ALTER TABLE sources ADD COLUMN last_fetch_ok INTEGER;
+            ALTER TABLE sources ADD COLUMN last_fetch_error TEXT;
+
+            ALTER TABLE calendars ADD COLUMN viewer_hide_private INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE views    ADD COLUMN viewer_hide_private INTEGER;
+        """,
+    },
 }
