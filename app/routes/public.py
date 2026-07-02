@@ -22,8 +22,9 @@ def _fetch_events_range(app, user_slug, calendar_slug, view_slug, start, end, cf
     # Apply per-calendar look-behind/ahead to the expansion window
     days_behind = int((cfg or {}).get("expansion_days_behind", 0))
     days_ahead  = int((cfg or {}).get("expansion_days_ahead", 180))
-    exp_start = min(start, datetime.datetime.now() - datetime.timedelta(days=days_behind))
-    exp_end   = max(end,   datetime.datetime.now() + datetime.timedelta(days=days_ahead))
+    now = datetime.datetime.now(tz=start.tzinfo)
+    exp_start = min(start, now - datetime.timedelta(days=days_behind))
+    exp_end   = max(end,   now + datetime.timedelta(days=days_ahead))
     try:
         ical_bytes = builder.build(
             user_slug=user_slug,

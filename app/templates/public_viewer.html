@@ -85,6 +85,37 @@
       #calendar { height: 560px; }
     }
 
+    /* ── List view ──────────────────────────────────────────────────────── */
+    .list-view { display: none; }
+    .list-view.active { display: block; }
+    .list-empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: .9rem; }
+    .list-group { margin-bottom: .5rem; }
+    .list-date-header {
+      position: sticky; top: 0; z-index: 1;
+      background: var(--bg); border-bottom: 1.5px solid var(--border);
+      padding: .45rem .75rem; font-size: .78rem; font-weight: 700;
+      color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .list-date-header .ldate-day { font-size: 1.5rem; font-weight: 800; color: var(--text); line-height: 1; }
+    .list-date-header .ldate-today { color: var(--accent); }
+    .list-event {
+      display: flex; align-items: flex-start; gap: .75rem;
+      padding: .6rem .75rem; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .12s;
+    }
+    .list-event:last-child { border-bottom: none; }
+    .list-event:hover { background: var(--bg); }
+    .list-event-dot {
+      flex-shrink: 0; width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent); margin-top: .35rem;
+    }
+    .list-event-body { flex: 1; min-width: 0; }
+    .list-event-title { font-weight: 600; font-size: .9rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .list-event-meta { font-size: .78rem; color: var(--muted); margin-top: .1rem; display: flex; flex-wrap: wrap; gap: 0 .75rem; }
+    .list-window-nav { display: flex; align-items: center; justify-content: space-between; padding: .6rem .75rem; border-top: 1.5px solid var(--border); }
+    .list-window-label { font-size: .82rem; color: var(--muted); }
+
     @media print {
       .toolbar { display: none !important; }
       .pub-body { margin: 0; padding: 0; max-width: 100%; }
@@ -121,11 +152,21 @@
       <button class="view-btn" data-view="month">Month</button>
       <button class="view-btn" data-view="week">Week</button>
       <button class="view-btn" data-view="day">Day</button>
+      <button class="view-btn" data-view="list">List</button>
     </div>
   </div>
 
   <div class="cal-wrap">
     <div id="calendar"></div>
+  </div>
+
+  <div class="cal-wrap list-view" id="list-view">
+    <div id="list-content"></div>
+    <div class="list-window-nav">
+      <button class="nav-btn" id="list-prev" title="Previous period">&#8249;</button>
+      <span class="list-window-label" id="list-period-label"></span>
+      <button class="nav-btn" id="list-next" title="Next period">&#8250;</button>
+    </div>
   </div>
 </div>
 
@@ -148,19 +189,17 @@ const calendar = new tui.Calendar('#calendar', {
       const showTime = event.raw && event.raw.showTime;
       return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title || 'Busy');
     },
-    allday(event) {
-      return event.title || 'Busy';
-    },
+    allday(event) { return event.title || 'Busy'; },
   },
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
 
 function periodLabel(view) {
-  const start = calendar.getDateRangeStart().toDate();
-  const end = calendar.getDateRangeEnd().toDate();
   const monthFmt = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
   const dayFmt = d => d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
-  if (view === 'month') return monthFmt(start);
+  if (view === 'month') return monthFmt(calendar.getDate().toDate());
+  const start = calendar.getDateRangeStart().toDate();
+  const end = calendar.getDateRangeEnd().toDate();
   if (view === 'day') return start.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
   return dayFmt(start) + ' – ' + dayFmt(end);
 }
@@ -182,26 +221,138 @@ function refresh() {
   loadEvents();
 }
 
+// ── List view ─────────────────────────────────────────────────────────────────
+let listAnchor = new Date(); // start of current 30-day window
+listAnchor.setHours(0, 0, 0, 0);
+
+function listWindowDates() {
+  const start = new Date(listAnchor);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 30);
+  return { start, end };
+}
+
+function fmtListPeriod(start, end) {
+  const d = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const y = end.toLocaleDateString(undefined, { year: 'numeric' });
+  return d(start) + ' – ' + d(new Date(end.getTime() - 1)) + ' ' + y;
+}
+
+async function loadListView() {
+  const { start, end } = listWindowDates();
+  document.getElementById('list-period-label').textContent = fmtListPeriod(start, end);
+  const url = EVENTS_URL + '?start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
+  const res = await fetch(url);
+  const content = document.getElementById('list-content');
+  if (!res.ok) { content.innerHTML = '<p class="list-empty">Failed to load events.</p>'; return; }
+  const events = await res.json();
+
+  if (!events.length) {
+    content.innerHTML = '<p class="list-empty">No events in this period.</p>';
+    return;
+  }
+
+  // Group by date key (YYYY-MM-DD)
+  const today = new Date(); today.setHours(0,0,0,0);
+  const groups = {};
+  const groupOrder = [];
+  for (const ev of events) {
+    const d = new Date(ev.start);
+    const key = d.toISOString().slice(0, 10);
+    if (!groups[key]) { groups[key] = { date: d, events: [] }; groupOrder.push(key); }
+    groups[key].events.push(ev);
+  }
+
+  const html = groupOrder.map(key => {
+    const { date, events: evs } = groups[key];
+    const isToday = date.getTime() === today.getTime();
+    const dayNum = date.toLocaleDateString(undefined, { day: 'numeric' });
+    const dayName = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short' });
+    const headerClass = isToday ? 'ldate-today' : '';
+
+    const evHtml = evs.map(ev => {
+      const start = new Date(ev.start);
+      const timePart = ev.isAllday ? 'All day' : fmtTime(start);
+      const loc = ev.location ? `<span>${ev.location}</span>` : '';
+      return `<div class="list-event">
+        <div class="list-event-dot"></div>
+        <div class="list-event-body">
+          <div class="list-event-title">${escHtml(ev.title || 'Busy')}</div>
+          <div class="list-event-meta"><span>${timePart}</span>${loc}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="list-group">
+      <div class="list-date-header">
+        <span class="ldate-day ${headerClass}">${dayNum}</span>
+        <span>${dayName}</span>
+      </div>
+      ${evHtml}
+    </div>`;
+  }).join('');
+
+  content.innerHTML = html;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('list-prev').addEventListener('click', () => {
+  listAnchor.setDate(listAnchor.getDate() - 30);
+  loadListView();
+});
+document.getElementById('list-next').addEventListener('click', () => {
+  listAnchor.setDate(listAnchor.getDate() + 30);
+  loadListView();
+});
+
+// ── View switching ─────────────────────────────────────────────────────────────
+let currentView = 'month';
+
+function switchView(view) {
+  currentView = view;
+  const calWrap = document.querySelector('.cal-wrap:not(.list-view)');
+  const listWrap = document.getElementById('list-view');
+  const navGroup = document.querySelector('.nav-group');
+
+  if (view === 'list') {
+    calWrap.style.display = 'none';
+    listWrap.classList.add('active');
+    navGroup.style.display = 'none';
+    document.getElementById('period-label').textContent = '';
+    loadListView();
+  } else {
+    calWrap.style.display = '';
+    listWrap.classList.remove('active');
+    navGroup.style.display = '';
+    calendar.changeView(view);
+    refresh();
+  }
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+}
+
 document.getElementById('btn-prev').addEventListener('click', () => { calendar.prev(); refresh(); });
 document.getElementById('btn-next').addEventListener('click', () => { calendar.next(); refresh(); });
-document.getElementById('btn-today').addEventListener('click', () => { calendar.today(); refresh(); });
+document.getElementById('btn-today').addEventListener('click', () => {
+  if (currentView === 'list') {
+    listAnchor = new Date(); listAnchor.setHours(0,0,0,0);
+    loadListView();
+  } else {
+    calendar.today(); refresh();
+  }
+});
 
 document.querySelectorAll('.view-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const view = btn.dataset.view;
-    calendar.changeView(view);
-    document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b === btn));
-    refresh();
-  });
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
 
 // Mobile default: day view; desktop default: month
 (function init() {
   const isMobile = window.innerWidth <= 600;
   const defaultView = isMobile ? 'day' : 'month';
-  calendar.changeView(defaultView);
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === defaultView));
-  refresh();
+  switchView(defaultView);
 })();
 </script>
 </body>
