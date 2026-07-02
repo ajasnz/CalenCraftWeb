@@ -47,14 +47,19 @@ class CalendarBuilder:
 
         events_by_source = []
         for id, url in sources_to_build:
+            fetch_at = datetime.datetime.utcnow().isoformat()
             try:
                 this_source_raw_ical = requests.get(
                     url, timeout=15, headers={"User-Agent": "CalenCraft/1.0"}
                 ).text
                 this_source_events = Calendar.from_ical(this_source_raw_ical)
                 events_by_source.append((id, this_source_events))
+                if self.db and hasattr(self.db, "update_source_fetch_status"):
+                    self.db.update_source_fetch_status(id, fetch_at, 1, None)
             except Exception as e:
                 log.warning("Error fetching source %s at %s: %s", id, url, e)
+                if self.db and hasattr(self.db, "update_source_fetch_status"):
+                    self.db.update_source_fetch_status(id, fetch_at, 0, str(e)[:500])
                 continue
         return events_by_source
 

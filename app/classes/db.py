@@ -264,7 +264,8 @@ class CalendarDB:
                 for key in ("share_ics", "share_viewer", "viewer_password",
                             "viewer_title", "viewer_description", "viewer_color",
                             "viewer_free_busy_only", "viewer_links",
-                            "viewer_show_time", "viewer_show_description", "viewer_show_location"):
+                            "viewer_show_time", "viewer_show_description", "viewer_show_location",
+                            "viewer_hide_private"):
                     if view.get(key) is not None:
                         cfg[key] = view[key]
         return cfg
@@ -272,14 +273,19 @@ class CalendarDB:
     def update_calendar_sharing(self, calendar_id, share_ics, share_viewer, viewer_password,
                                 viewer_title, viewer_description, viewer_color,
                                 viewer_free_busy_only, viewer_links,
-                                viewer_show_time, viewer_show_description, viewer_show_location):
+                                viewer_show_time, viewer_show_description, viewer_show_location,
+                                viewer_hide_private=0):
         self._execute(self._named("calendar_update_sharing"), (
             share_ics, share_viewer, viewer_password,
             viewer_title, viewer_description, viewer_color,
             viewer_free_busy_only, viewer_links,
             viewer_show_time, viewer_show_description, viewer_show_location,
+            viewer_hide_private,
             calendar_id,
         ))
+
+    def update_source_fetch_status(self, source_id, fetch_at, ok, error=None):
+        self._execute(self._named("source_update_fetch_status"), (fetch_at, ok, error, source_id))
 
     def update_calendar_settings(self, calendar_id, expansion_days_ahead,
                                  expansion_days_behind, default_view_enabled):

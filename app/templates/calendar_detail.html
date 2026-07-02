@@ -30,7 +30,16 @@
       </td>
       <td class="url-cell"><code>{{ s.url }}</code></td>
       <td>
-        <span class="test-status" id="test-{{ s.id }}" style="font-size:.8rem;color:var(--muted)">—</span>
+        {% if s.last_fetch_at %}
+          {% if s.last_fetch_ok %}
+            <span class="fetch-ok" title="Last fetched: {{ s.last_fetch_at }} UTC">✓ OK</span>
+          {% else %}
+            <span class="fetch-err" title="{{ s.last_fetch_error or 'Unknown error' }} ({{ s.last_fetch_at }} UTC)">✕ Error</span>
+          {% endif %}
+        {% else %}
+          <span style="color:var(--muted);font-size:.8rem">—</span>
+        {% endif %}
+        <span class="test-status" id="test-{{ s.id }}" style="font-size:.8rem;color:var(--muted);margin-left:.4rem"></span>
       </td>
       <td class="row-actions">
         <button class="btn btn-sm btn-ghost" onclick="testSource({{ s.id }}, '{{ url_for('ui.source_test', calendar_slug=cal.slug, source_id=s.id) }}')" title="Test URL">Test</button>
@@ -307,6 +316,7 @@
     <div class="form-card">
       <div class="form-card-title">Event Display</div>
       <label class="checkbox-label"><input type="checkbox" name="viewer_free_busy_only" {% if cal.viewer_free_busy_only %}checked{% endif %}> Show as Free/Busy only (hide event details)</label>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_hide_private" {% if cal.viewer_hide_private %}checked{% endif %}> Hide details of events marked Private or Confidential</label>
       <label class="checkbox-label"><input type="checkbox" name="viewer_show_time" {% if cal.viewer_show_time %}checked{% endif %}> Show event time</label>
       <label class="checkbox-label"><input type="checkbox" name="viewer_show_description" {% if cal.viewer_show_description %}checked{% endif %}> Show event description</label>
       <label class="checkbox-label"><input type="checkbox" name="viewer_show_location" {% if cal.viewer_show_location %}checked{% endif %}> Show location</label>
@@ -395,6 +405,8 @@
 <style>
 .src-disabled td:first-child { opacity: .5; }
 .src-disabled code { opacity: .5; }
+.fetch-ok  { font-size: .78rem; font-weight: 600; color: var(--success); }
+.fetch-err { font-size: .78rem; font-weight: 600; color: var(--danger); cursor: help; }
 
 .badge-not {
   display: inline-flex; align-items: center;

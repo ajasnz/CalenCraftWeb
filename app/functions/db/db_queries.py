@@ -46,8 +46,12 @@ queries = {
             share_ics=?, share_viewer=?, viewer_password=?,
             viewer_title=?, viewer_description=?, viewer_color=?,
             viewer_free_busy_only=?, viewer_links=?,
-            viewer_show_time=?, viewer_show_description=?, viewer_show_location=?
+            viewer_show_time=?, viewer_show_description=?, viewer_show_location=?,
+            viewer_hide_private=?
         WHERE id=?
+    """,
+    "source_update_fetch_status": """
+        UPDATE sources SET last_fetch_at=?, last_fetch_ok=?, last_fetch_error=? WHERE id=?
     """,
     "calendar_update_settings": """
         UPDATE calendars SET
