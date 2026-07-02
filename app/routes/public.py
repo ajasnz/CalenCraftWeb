@@ -17,12 +17,15 @@ def _strip_tz(dt):
 
 def _fetch_events_range(app, user_slug, calendar_slug, view_slug, start, end, cfg=None):
     """Fetch and parse events between start and end datetimes."""
+    # Normalise to naive UTC so all comparisons are timezone-consistent
+    start = _strip_tz(start)
+    end   = _strip_tz(end)
     builder = CalendarBuilder()
     builder.db = app.db
     # Apply per-calendar look-behind/ahead to the expansion window
     days_behind = int((cfg or {}).get("expansion_days_behind", 0))
     days_ahead  = int((cfg or {}).get("expansion_days_ahead", 180))
-    now = datetime.datetime.now(tz=start.tzinfo)
+    now = datetime.datetime.utcnow()
     exp_start = min(start, now - datetime.timedelta(days=days_behind))
     exp_end   = max(end,   now + datetime.timedelta(days=days_ahead))
     try:
