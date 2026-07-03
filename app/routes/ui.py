@@ -179,8 +179,15 @@ def _nav_calendars():
 @ui_bp.route("/")
 @login_required
 def dashboard():
-    calendars = current_app.db.get_calendars(session["user_id"])
-    return render_template("dashboard.html", calendars=calendars, nav_calendars=calendars)
+    db = current_app.db
+    calendars = db.get_calendars(session["user_id"])
+    cal_list = []
+    for cal in calendars:
+        d = dict(cal)
+        d["source_count"] = len(db.get_sources(cal["id"]))
+        d["view_count"]   = len(db.get_views(cal["id"]))
+        cal_list.append(d)
+    return render_template("dashboard.html", calendars=cal_list, nav_calendars=calendars)
 
 
 # ------------------------------------------------------------------

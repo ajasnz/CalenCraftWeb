@@ -1,8 +1,43 @@
 {% extends "base.html" %}
 {% block title %}{{ cal.title }} — CalenCraft{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h2>{{ cal.title }}</h2>
+
+<div class="cal-hero">
+  <div class="cal-hero-head">
+    <h2>{{ cal.title }}</h2>
+    <span class="cal-hero-slug">{{ cal.slug }}</span>
+  </div>
+  <div class="cal-hero-links">
+    {# Feed URL chip #}
+    {% if cal.share_ics %}
+    <div class="url-chip">
+      <span class="url-chip-label">Feed</span>
+      <span class="url-chip-url" id="chip-feed-default">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</span>
+      <button class="url-chip-btn" onclick="copyChip('chip-feed-default', this)" title="Copy feed URL">Copy</button>
+    </div>
+    {% else %}
+    <div class="url-chip" style="opacity:.55" title="Enable ICS sharing to activate">
+      <span class="url-chip-label">Feed</span>
+      <span class="url-chip-url" style="color:var(--muted)">Sharing disabled</span>
+      <a class="url-chip-btn is-link" href="?tab=sharing">Enable →</a>
+    </div>
+    {% endif %}
+    {# Viewer URL chip #}
+    {% if cal.share_viewer %}
+    <div class="url-chip">
+      <span class="url-chip-label">Viewer</span>
+      <span class="url-chip-url" id="chip-viewer-default">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</span>
+      <button class="url-chip-btn" onclick="copyChip('chip-viewer-default', this)" title="Copy viewer URL">Copy</button>
+      <a class="url-chip-btn is-link" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" rel="noopener" title="Open public viewer">Open ↗</a>
+    </div>
+    {% else %}
+    <div class="url-chip" style="opacity:.55" title="Enable public viewer to activate">
+      <span class="url-chip-label">Viewer</span>
+      <span class="url-chip-url" style="color:var(--muted)">Not enabled</span>
+      <a class="url-chip-btn is-link" href="?tab=sharing">Enable →</a>
+    </div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="tabs" id="tabs">
@@ -460,6 +495,10 @@ function showTab(id, el, event) {
   history.replaceState(null, '', '?tab=' + id);
 }
 
+function copyChip(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).textContent.trim());
+  if (btn) { const orig = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = orig, 1800); }
+}
 function copyUrl(id, btn) {
   navigator.clipboard.writeText(document.getElementById(id).textContent.trim());
   if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
