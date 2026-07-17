@@ -71,9 +71,27 @@
 
     .cal-wrap {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 2px; overflow: hidden;
+      border-radius: 2px; overflow: auto; position: relative;
     }
     #calendar { height: 720px; }
+
+    /* ── Loading overlay ──────────────────────────────────────────────── */
+    #cal-loading {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(255,255,255,.85);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: .75rem;
+    }
+    #cal-loading.hidden { display: none; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border-2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-label { font-size: .82rem; color: var(--muted); }
 
     @media (max-width: 600px) {
       .pub-header { padding: 1rem; }
@@ -157,6 +175,10 @@
   </div>
 
   <div class="cal-wrap">
+    <div id="cal-loading">
+      <div class="spinner"></div>
+      <div class="loading-label">Loading events…</div>
+    </div>
     <div id="calendar"></div>
   </div>
 
@@ -173,107 +195,127 @@
 <script>
 const EVENTS_URL = {{ url_for('public.viewer_events', user_slug=user_slug, calendar_slug=calendar_slug, view_slug=view_slug) | tojson }};
 const ACCENT = {{ _accent | tojson }};
+// Expansion window — fetch once for this full range
+const DAYS_BEHIND = {{ (cfg.expansion_days_behind or 0) | int }};
+const DAYS_AHEAD  = {{ (cfg.expansion_days_ahead  or 180) | int }};
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function fmtTime(date) { return pad(date.getHours()) + ':' + pad(date.getMinutes()); }
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── All events fetched once ───────────────────────────────────────────────────
+let allEvents = [];      // raw JSON from server, cached for the session
+let eventsLoaded = false;
 
 const calendar = new tui.Calendar('#calendar', {
   defaultView: 'month',
   isReadOnly: true,
   useDetailPopup: true,
   usageStatistics: false,
-  week: { startDayOfWeek: 1, hourStart: 0, hourEnd: 24, eventView: ['time', 'allday'], taskView: false },
+  week: { startDayOfWeek: 1, hourStart: 0, hourEnd: 24, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true },
   month: { startDayOfWeek: 1 },
   template: {
     time(event) {
       const showTime = event.raw && event.raw.showTime;
-      return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title || 'Busy');
+      return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title);
     },
-    allday(event) { return event.title || 'Busy'; },
+    allday(event) { return event.title; },
   },
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
 
+function setLoading(on) {
+  document.getElementById('cal-loading').classList.toggle('hidden', !on);
+}
+
+async function fetchAllEvents() {
+  const now = new Date();
+  const start = new Date(now); start.setDate(start.getDate() - DAYS_BEHIND);
+  const end   = new Date(now); end.setDate(end.getDate() + DAYS_AHEAD);
+  const url = EVENTS_URL
+    + '?start=' + encodeURIComponent(start.toISOString())
+    + '&end='   + encodeURIComponent(end.toISOString());
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    allEvents = await res.json();
+    eventsLoaded = true;
+    calendar.createEvents(allEvents);
+  } finally {
+    setLoading(false);
+  }
+}
+
 function periodLabel(view) {
   const monthFmt = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-  const dayFmt = d => d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+  const dayFmt   = d => d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
   if (view === 'month') return monthFmt(calendar.getDate().toDate());
   const start = calendar.getDateRangeStart().toDate();
-  const end = calendar.getDateRangeEnd().toDate();
   if (view === 'day') return start.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const end = calendar.getDateRangeEnd().toDate();
   return dayFmt(start) + ' – ' + dayFmt(end);
 }
 
-async function loadEvents() {
-  const start = calendar.getDateRangeStart().toDate();
-  const end = calendar.getDateRangeEnd().toDate();
-  const url = EVENTS_URL + '?start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
-  const res = await fetch(url);
-  if (!res.ok) return;
-  const events = await res.json();
-  calendar.clear();
-  calendar.createEvents(events);
-}
-
-function refresh() {
+function updateLabel() {
   const view = calendar.getViewName();
   document.getElementById('period-label').textContent = periodLabel(view);
-  loadEvents();
 }
 
-// ── List view ─────────────────────────────────────────────────────────────────
-let listAnchor = new Date(); // start of current 30-day window
+// ── List view (filtered from local cache) ────────────────────────────────────
+const LIST_WINDOW = 30; // days
+let listAnchor = new Date();
 listAnchor.setHours(0, 0, 0, 0);
 
 function listWindowDates() {
   const start = new Date(listAnchor);
   const end = new Date(start);
-  end.setDate(end.getDate() + 30);
+  end.setDate(end.getDate() + LIST_WINDOW);
   return { start, end };
 }
 
 function fmtListPeriod(start, end) {
-  const d = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const fmt = d => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const y = end.toLocaleDateString(undefined, { year: 'numeric' });
-  return d(start) + ' – ' + d(new Date(end.getTime() - 1)) + ' ' + y;
+  return fmt(start) + ' – ' + fmt(new Date(end.getTime() - 1)) + ' ' + y;
 }
 
-async function loadListView() {
+function renderListView() {
   const { start, end } = listWindowDates();
   document.getElementById('list-period-label').textContent = fmtListPeriod(start, end);
-  const url = EVENTS_URL + '?start=' + encodeURIComponent(start.toISOString()) + '&end=' + encodeURIComponent(end.toISOString());
-  const res = await fetch(url);
   const content = document.getElementById('list-content');
-  if (!res.ok) { content.innerHTML = '<p class="list-empty">Failed to load events.</p>'; return; }
-  const events = await res.json();
 
-  if (!events.length) {
+  const startMs = start.getTime();
+  const endMs   = end.getTime();
+  const visible = allEvents.filter(ev => {
+    const evStart = new Date(ev.start).getTime();
+    return evStart >= startMs && evStart < endMs;
+  });
+
+  if (!visible.length) {
     content.innerHTML = '<p class="list-empty">No events in this period.</p>';
     return;
   }
 
-  // Group by date key (YYYY-MM-DD)
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
   const groups = {};
   const groupOrder = [];
-  for (const ev of events) {
+  for (const ev of visible) {
     const d = new Date(ev.start);
     const key = d.toISOString().slice(0, 10);
     if (!groups[key]) { groups[key] = { date: d, events: [] }; groupOrder.push(key); }
     groups[key].events.push(ev);
   }
 
-  const html = groupOrder.map(key => {
+  content.innerHTML = groupOrder.map(key => {
     const { date, events: evs } = groups[key];
     const isToday = date.getTime() === today.getTime();
-    const dayNum = date.toLocaleDateString(undefined, { day: 'numeric' });
+    const dayNum  = date.toLocaleDateString(undefined, { day: 'numeric' });
     const dayName = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short' });
-    const headerClass = isToday ? 'ldate-today' : '';
-
     const evHtml = evs.map(ev => {
-      const start = new Date(ev.start);
-      const timePart = ev.isAllday ? 'All day' : fmtTime(start);
-      const loc = ev.location ? `<span>${ev.location}</span>` : '';
+      const timePart = ev.isAllday ? 'All day' : fmtTime(new Date(ev.start));
+      const loc = ev.location ? `<span>${escHtml(ev.location)}</span>` : '';
       return `<div class="list-event">
         <div class="list-event-dot"></div>
         <div class="list-event-body">
@@ -282,38 +324,30 @@ async function loadListView() {
         </div>
       </div>`;
     }).join('');
-
     return `<div class="list-group">
       <div class="list-date-header">
-        <span class="ldate-day ${headerClass}">${dayNum}</span>
+        <span class="ldate-day${isToday ? ' ldate-today' : ''}">${dayNum}</span>
         <span>${dayName}</span>
-      </div>
-      ${evHtml}
+      </div>${evHtml}
     </div>`;
   }).join('');
-
-  content.innerHTML = html;
-}
-
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 document.getElementById('list-prev').addEventListener('click', () => {
-  listAnchor.setDate(listAnchor.getDate() - 30);
-  loadListView();
+  listAnchor.setDate(listAnchor.getDate() - LIST_WINDOW);
+  renderListView();
 });
 document.getElementById('list-next').addEventListener('click', () => {
-  listAnchor.setDate(listAnchor.getDate() + 30);
-  loadListView();
+  listAnchor.setDate(listAnchor.getDate() + LIST_WINDOW);
+  renderListView();
 });
 
-// ── View switching ─────────────────────────────────────────────────────────────
+// ── View switching ────────────────────────────────────────────────────────────
 let currentView = 'month';
 
 function switchView(view) {
   currentView = view;
-  const calWrap = document.querySelector('.cal-wrap:not(.list-view)');
+  const calWrap  = document.querySelector('.cal-wrap:not(.list-view)');
   const listWrap = document.getElementById('list-view');
   const navGroup = document.querySelector('.nav-group');
 
@@ -322,25 +356,25 @@ function switchView(view) {
     listWrap.classList.add('active');
     navGroup.style.display = 'none';
     document.getElementById('period-label').textContent = '';
-    loadListView();
+    renderListView();
   } else {
     calWrap.style.display = '';
     listWrap.classList.remove('active');
     navGroup.style.display = '';
     calendar.changeView(view);
-    refresh();
+    updateLabel();
   }
   document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
 }
 
-document.getElementById('btn-prev').addEventListener('click', () => { calendar.prev(); refresh(); });
-document.getElementById('btn-next').addEventListener('click', () => { calendar.next(); refresh(); });
+document.getElementById('btn-prev').addEventListener('click', () => { calendar.prev(); updateLabel(); });
+document.getElementById('btn-next').addEventListener('click', () => { calendar.next(); updateLabel(); });
 document.getElementById('btn-today').addEventListener('click', () => {
   if (currentView === 'list') {
-    listAnchor = new Date(); listAnchor.setHours(0,0,0,0);
-    loadListView();
+    listAnchor = new Date(); listAnchor.setHours(0, 0, 0, 0);
+    renderListView();
   } else {
-    calendar.today(); refresh();
+    calendar.today(); updateLabel();
   }
 });
 
@@ -348,11 +382,11 @@ document.querySelectorAll('.view-btn').forEach(btn => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
 
-// Mobile default: day view; desktop default: month
+// ── Init ─────────────────────────────────────────────────────────────────────
 (function init() {
   const isMobile = window.innerWidth <= 600;
-  const defaultView = isMobile ? 'day' : 'month';
-  switchView(defaultView);
+  switchView(isMobile ? 'day' : 'month');
+  fetchAllEvents(); // single fetch — shows spinner until done
 })();
 </script>
 </body>
