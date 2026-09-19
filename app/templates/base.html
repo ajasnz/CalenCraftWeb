@@ -1,3 +1,4 @@
+{% import '_icons.html' as icons %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,13 +20,13 @@
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <a class="brand" href="{{ url_for('ui.dashboard') }}">CalenCraft</a>
-    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close">✕</button>
+    <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close">{{ icons.icon('x') }}</button>
   </div>
 
   <div class="sidebar-section">
     <a class="sidebar-item {% if request.endpoint == 'ui.dashboard' %}active{% endif %}"
        href="{{ url_for('ui.dashboard') }}">
-      <span class="sidebar-icon">⊞</span>
+      <span class="sidebar-icon">{{ icons.icon('grid') }}</span>
       <span class="sidebar-text">Dashboard</span>
     </a>
   </div>
@@ -35,12 +36,12 @@
     {% for cal in nav_calendars %}
     <a class="sidebar-item {% if request.view_args and request.view_args.get('calendar_slug') == cal.slug %}active{% endif %}"
        href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">
-      <span class="sidebar-icon">📅</span>
+      <span class="sidebar-icon">{{ icons.icon('calendar') }}</span>
       <span class="sidebar-text">{{ cal.title }}</span>
     </a>
     {% endfor %}
     <a class="sidebar-item sidebar-add" href="{{ url_for('ui.calendar_new') }}">
-      <span class="sidebar-icon">＋</span>
+      <span class="sidebar-icon">{{ icons.icon('plus') }}</span>
       <span class="sidebar-text">New Calendar</span>
     </a>
   </div>
@@ -50,7 +51,7 @@
     <div class="sidebar-label">Admin</div>
     <a class="sidebar-item {% if request.endpoint and request.endpoint.startswith('ui.admin') %}active{% endif %}"
        href="{{ url_for('ui.admin_users') }}">
-      <span class="sidebar-icon">👥</span>
+      <span class="sidebar-icon">{{ icons.icon('users') }}</span>
       <span class="sidebar-text">Users</span>
     </a>
   </div>
@@ -62,13 +63,13 @@
       <span class="sidebar-avatar">{{ _initial }}</span>
       <span class="sidebar-text">{{ _username }}</span>
     </a>
-    <a href="{{ url_for('auth.logout') }}" class="sidebar-logout" title="Log out">↪</a>
+    <a href="{{ url_for('auth.logout') }}" class="sidebar-logout" title="Log out">{{ icons.icon('log-out') }}</a>
   </div>
 </nav>
 <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <header class="topbar">
-  <button class="hamburger" onclick="openSidebar()" aria-label="Menu">&#9776;</button>
+  <button class="hamburger" onclick="openSidebar()" aria-label="Menu">{{ icons.icon('menu') }}</button>
   <a class="topbar-brand" href="{{ url_for('ui.dashboard') }}">CalenCraft</a>
 </header>
 {% endif %}

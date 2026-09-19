@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import '_icons.html' as icons %}
+{% block title %}CalenCraft — Programmable calendar feeds{% endblock %}
+{% block content %}
+<div class="landing-hero">
+  <div class="landing-logo">{{ icons.icon('calendar-big') }}</div>
+  <h1>CalenCraft</h1>
+  <p class="landing-tagline">Merge, filter, and transform your calendar feeds — then share one clean URL.</p>
+  <div class="landing-actions">
+    <a class="btn" href="{{ url_for('auth.login') }}">Log in</a>
+  </div>
+</div>
+
+<div class="landing-features">
+  <div class="landing-feature">
+    <span class="landing-feature-icon">{{ icons.icon('list') }}</span>
+    <h3>Combine sources</h3>
+    <p>Pull in multiple .ics feeds and merge them into a single calendar.</p>
+  </div>
+  <div class="landing-feature">
+    <span class="landing-feature-icon">{{ icons.icon('grid') }}</span>
+    <h3>Filter &amp; transform</h3>
+    <p>Include, exclude, or rewrite events with rules before they reach subscribers.</p>
+  </div>
+  <div class="landing-feature">
+    <span class="landing-feature-icon">{{ icons.icon('external-link') }}</span>
+    <h3>Share a clean link</h3>
+    <p>Subscribe via .ics, or share a branded public web viewer.</p>
+  </div>
+</div>
+{% endblock %}

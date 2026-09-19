@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}{{ form_title }} — {{ cal.title }}{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug, tab='filters') }}">{{ icons.icon('chevron-left') }} Back to {{ cal.title }}</a>
 <div class="page-header">
   <h2>{{ form_title }}</h2>
-  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug, tab='filters') }}">Back</a>
 </div>
 
 {% set flt = filter_ or {} %}
@@ -34,7 +35,7 @@
   <div id="pattern-text-row">
     <label for="pattern">Pattern</label>
     <input id="pattern" name="pattern" type="text" required
-           value="{% if flt.get('property') not in ('X-SOURCE-ID',) + property_enum_values.keys()|list %}{{ flt.get('pattern', '') }}{% endif %}"
+           value="{% if flt.get('property') not in (['X-SOURCE-ID'] + property_enum_values.keys()|list) %}{{ flt.get('pattern', '') }}{% endif %}"
            placeholder="e.g. Meeting, .*Conference.*, OOO">
   </div>
 

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}{{ cal.title }} — CalenCraft{% endblock %}
 {% block content %}
 
@@ -102,26 +103,32 @@
     <h3>Views</h3>
     <a class="btn btn-sm" href="{{ url_for('ui.view_new', calendar_slug=cal.slug) }}">+ New View</a>
   </div>
-  <div class="feed-url-box">
-    <strong>Default feed:</strong>
-    <code id="default-feed-url">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
-    <button class="btn btn-sm btn-ghost" onclick="copyUrl('default-feed-url', this)">Copy</button>
-    {% if cal.share_viewer %}
-    <strong>Viewer:</strong>
-    <code id="default-view-url">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
-    <button class="btn btn-sm btn-ghost" onclick="copyUrl('default-view-url', this)">Copy</button>
-    {% endif %}
-  </div>
-  {% if not cal.default_view_enabled %}
-  <div class="info-box" style="margin-bottom:.875rem;background:var(--warning-bg);border-color:#fde68a;color:var(--warning)">
-    The default view is currently disabled. Enable it in the Advanced tab.
-  </div>
-  {% endif %}
-  {% if views %}
+  <p class="hint" style="margin-bottom:.875rem">Every calendar has a built-in <strong>Default</strong> view. Add named views to publish separately filtered feeds — e.g. one for clients, one for your team.</p>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Title</th><th>Slug</th><th>Feed URL</th><th></th></tr></thead>
+    <thead><tr><th>Title</th><th>Slug</th><th>Feed URL</th>{% if cal.share_viewer %}<th>Viewer URL</th>{% endif %}<th></th></tr></thead>
     <tbody>
+    <tr>
+      <td>Default <span class="badge badge-disabled" style="margin-left:.3rem">Built-in</span></td>
+      <td><code>default</code></td>
+      {% if cal.default_view_enabled %}
+      <td>
+        <code id="feed-default">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button class="btn btn-sm btn-ghost" onclick="copyUrl('feed-default', this)">Copy</button>
+      </td>
+      {% if cal.share_viewer %}
+      <td>
+        <code id="viewer-default">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button class="btn btn-sm btn-ghost" onclick="copyUrl('viewer-default', this)">Copy</button>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" rel="noopener">Open</a>
+      </td>
+      {% endif %}
+      <td></td>
+      {% else %}
+      <td colspan="{{ 2 if cal.share_viewer else 1 }}" style="color:var(--muted)">Disabled</td>
+      <td><a class="btn btn-sm btn-ghost" href="?tab=advanced">Enable →</a></td>
+      {% endif %}
+    </tr>
     {% for v in views %}
     <tr>
       <td>{{ v.title }}</td>
@@ -130,6 +137,13 @@
         <code id="feed-{{ v.id }}">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/{{ v.slug }}</code>
         <button class="btn btn-sm btn-ghost" onclick="copyUrl('feed-{{ v.id }}', this)">Copy</button>
       </td>
+      {% if cal.share_viewer %}
+      <td>
+        <code id="viewer-{{ v.id }}">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/{{ v.slug }}</code>
+        <button class="btn btn-sm btn-ghost" onclick="copyUrl('viewer-{{ v.id }}', this)">Copy</button>
+        <a class="btn btn-sm btn-secondary" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug=v.slug) }}" target="_blank" rel="noopener">Open</a>
+      </td>
+      {% endif %}
       <td>
         <form method="post" action="{{ url_for('ui.view_delete', calendar_slug=cal.slug, view_id=v.id) }}" onsubmit="return confirm('Delete this view?')">
           <button class="btn btn-sm btn-danger">Delete</button>
@@ -140,9 +154,6 @@
     </tbody>
   </table>
   </div>
-  {% else %}
-  <p class="empty">No views yet. <a href="{{ url_for('ui.view_new', calendar_slug=cal.slug) }}">Create one</a>.</p>
-  {% endif %}
 </section>
 
 {# ── FILTERS ── #}
@@ -317,9 +328,10 @@
         Allow ICS subscribe / download
       </label>
       {% if cal.share_ics %}
-      <div class="info-box" style="margin-top:.5rem">
-        Feed URL: <code>{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
-        <button type="button" class="btn btn-sm btn-ghost" style="margin-left:.25rem" onclick="copyText('{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default', this)">Copy</button>
+      <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0">
+        <strong>Feed URL:</strong>
+        <code id="sharing-feed-url">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('sharing-feed-url', this)">Copy</button>
       </div>
       {% endif %}
       <label class="checkbox-label" style="margin-top:.75rem">
@@ -327,10 +339,11 @@
         Enable public web viewer
       </label>
       {% if cal.share_viewer %}
-      <div class="info-box" style="margin-top:.5rem">
-        Viewer URL: <code>{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
-        <button type="button" class="btn btn-sm btn-ghost" style="margin-left:.25rem" onclick="copyText('{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default', this)">Copy</button>
-        <a href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" class="btn btn-sm btn-secondary" style="margin-left:.25rem">Open</a>
+      <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0">
+        <strong>Viewer URL:</strong>
+        <code id="sharing-viewer-url">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('sharing-viewer-url', this)">Copy</button>
+        <a href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" class="btn btn-sm btn-secondary">Open</a>
       </div>
       {% endif %}
     </div>
@@ -343,8 +356,8 @@
       <textarea id="viewer_description" name="viewer_description" rows="2" placeholder="Shown at the top of the public page">{{ cal.viewer_description or '' }}</textarea>
       <label for="viewer_color">Accent Colour</label>
       <div style="display:flex;gap:.75rem;align-items:center;margin-top:.35rem">
-        <input id="viewer_color" name="viewer_color" type="color" value="{{ cal.viewer_color or '#4361ee' }}" style="width:44px;height:34px;padding:2px;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)" oninput="document.getElementById('color-hex').textContent=this.value">
-        <span id="color-hex" style="font-family:ui-monospace,monospace;font-size:.85rem;color:var(--muted)">{{ cal.viewer_color or '#4361ee' }}</span>
+        <input id="viewer_color" name="viewer_color" type="color" value="{{ cal.viewer_color or '#0891b2' }}" style="width:44px;height:34px;padding:2px;border-radius:6px;cursor:pointer;border:1.5px solid var(--border)" oninput="document.getElementById('color-hex').textContent=this.value">
+        <span id="color-hex" style="font-family:ui-monospace,monospace;font-size:.85rem;color:var(--muted)">{{ cal.viewer_color or '#0891b2' }}</span>
       </div>
     </div>
 
@@ -376,7 +389,7 @@
       <div class="form-card-title">Password Protection</div>
       {% if cal.viewer_password %}
       <p class="hint">A password is currently set.</p>
-      <label class="checkbox-label"><input type="checkbox" name="viewer_password_remove"> Remove password</label>
+      <label class="checkbox-label"><input type="checkbox" name="viewer_password_remove" id="viewer_password_remove" onchange="document.getElementById('viewer_password_new').disabled = this.checked"> Remove password</label>
       <label for="viewer_password_new" style="margin-top:.75rem">Set new password (leave blank to keep current)</label>
       {% else %}
       <label for="viewer_password_new">Password (leave blank for no restriction)</label>
@@ -495,18 +508,13 @@ function showTab(id, el, event) {
   history.replaceState(null, '', '?tab=' + id);
 }
 
-function copyChip(id, btn) {
-  navigator.clipboard.writeText(document.getElementById(id).textContent.trim());
-  if (btn) { const orig = btn.textContent; btn.textContent = '✓'; setTimeout(() => btn.textContent = orig, 1800); }
-}
-function copyUrl(id, btn) {
-  navigator.clipboard.writeText(document.getElementById(id).textContent.trim());
+function copyToClipboard(text, btn) {
+  navigator.clipboard.writeText(text);
   if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
 }
-function copyText(t, btn) {
-  navigator.clipboard.writeText(t);
-  if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = orig, 1800); }
-}
+function copyChip(id, btn) { copyToClipboard(document.getElementById(id).textContent.trim(), btn); }
+function copyUrl(id, btn)  { copyToClipboard(document.getElementById(id).textContent.trim(), btn); }
+function copyText(t, btn)  { copyToClipboard(t, btn); }
 
 function addLink() {
   const c = document.getElementById('links-container');

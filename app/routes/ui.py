@@ -177,8 +177,10 @@ def _nav_calendars():
 # ------------------------------------------------------------------
 
 @ui_bp.route("/")
-@login_required
 def dashboard():
+    if "user_id" not in session:
+        return render_template("landing.html")
+
     db = current_app.db
     calendars = db.get_calendars(session["user_id"])
     cal_list = []

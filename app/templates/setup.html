@@ -20,7 +20,7 @@
     {% endwith %}
 
     <div class="auth-card" style="max-width:420px">
-      <div class="auth-logo">🗓</div>
+      <div class="auth-logo">{% import '_icons.html' as icons %}{{ icons.icon('calendar-big') }}</div>
       <h1>Welcome to CalenCraft</h1>
       <p class="tagline" style="margin-bottom:.5rem">Create your admin account to get started.</p>
       <p class="tagline" style="font-size:.78rem;color:var(--muted-light)">This page is only shown once — when no users exist.</p>

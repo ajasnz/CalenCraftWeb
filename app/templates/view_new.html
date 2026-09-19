@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}New View — {{ cal.title }}{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">{{ icons.icon('chevron-left') }} Back to {{ cal.title }}</a>
 <div class="page-header">
   <h2>New View for "{{ cal.title }}"</h2>
-  <a href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">← Back</a>
 </div>
 <div class="form-card">
   <form method="post">

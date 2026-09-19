@@ -44,6 +44,9 @@ def _clear_failures(ip: str):
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if "user_id" in session:
+        return redirect(url_for("ui.dashboard"))
+
     if request.method == "POST":
         ip = _client_ip()
 

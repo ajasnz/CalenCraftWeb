@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}Dashboard — CalenCraft{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -7,6 +8,12 @@
 </div>
 
 {% if calendars %}
+<div class="stat-row">
+  <div class="stat"><div class="stat-n">{{ calendars|length }}</div><div class="stat-l">Calendar{{ 's' if calendars|length != 1 }}</div></div>
+  <div class="stat"><div class="stat-n">{{ calendars|sum(attribute='source_count') }}</div><div class="stat-l">iCal sources</div></div>
+  <div class="stat"><div class="stat-n">{{ calendars|sum(attribute='view_count') }}</div><div class="stat-l">Views</div></div>
+  <div class="stat"><div class="stat-n">{{ calendars|selectattr('share_viewer')|list|length }}</div><div class="stat-l">Public viewers</div></div>
+</div>
 <div class="cal-grid">
   {% for cal in calendars %}
   <div class="cal-card">
@@ -14,8 +21,8 @@
       <div class="cal-card-title">{{ cal.title }}</div>
       <div class="cal-card-slug">{{ cal.slug }}</div>
       <div class="cal-card-stats">
-        <span class="cal-stat"><span class="cal-stat-icon">⊡</span> {{ cal.source_count }} source{{ 's' if cal.source_count != 1 }}</span>
-        <span class="cal-stat"><span class="cal-stat-icon">⊞</span> {{ cal.view_count }} view{{ 's' if cal.view_count != 1 }}</span>
+        <span class="cal-stat"><span class="cal-stat-icon">{{ icons.icon('list') }}</span> {{ cal.source_count }} source{{ 's' if cal.source_count != 1 }}</span>
+        <span class="cal-stat"><span class="cal-stat-icon">{{ icons.icon('grid') }}</span> {{ cal.view_count }} view{{ 's' if cal.view_count != 1 }}</span>
         {% if cal.share_ics %}<span class="cal-badge cal-badge-ics">ICS</span>{% endif %}
         {% if cal.share_viewer %}<span class="cal-badge cal-badge-viewer">Viewer</span>{% endif %}
       </div>
@@ -31,7 +38,7 @@
 </div>
 {% else %}
 <div class="empty-state">
-  <span class="empty-icon">🗓</span>
+  <span class="empty-icon">{{ icons.icon('calendar-big') }}</span>
   <h3>No calendars yet</h3>
   <p>CalenCraft aggregates ICS feeds, applies filters and transformations, and serves a merged calendar your clients can subscribe to.</p>
   <p class="empty-hint">Create a calendar → add sources → subscribe via the feed URL.</p>

@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}New User — Admin{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('ui.admin_users') }}">{{ icons.icon('chevron-left') }} Back to users</a>
 <div class="page-header">
   <h2>New User</h2>
-  <a href="{{ url_for('ui.admin_users') }}">← Back</a>
 </div>
 <div class="form-card">
   <form method="post">

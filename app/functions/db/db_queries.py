@@ -30,7 +30,7 @@ queries = {
 
     # --- Calendars ---
     "calendars_for_user": """
-        SELECT id, slug, title, state FROM calendars
+        SELECT * FROM calendars
         WHERE user_id = ? AND state = 'active' ORDER BY title
     """,
     "calendar_by_slug": """

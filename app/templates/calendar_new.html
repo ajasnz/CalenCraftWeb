@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}New Calendar — CalenCraft{% endblock %}
 {% block content %}
+<a class="back-link" href="{{ url_for('ui.dashboard') }}">{{ icons.icon('chevron-left') }} Back to dashboard</a>
 <div class="page-header">
   <h2>New Calendar</h2>
-  <a href="{{ url_for('ui.dashboard') }}">← Back</a>
 </div>
 <div class="form-card">
   <form method="post">

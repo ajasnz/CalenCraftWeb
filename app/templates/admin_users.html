@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import '_icons.html' as icons %}
 {% block title %}Users — Admin{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -12,11 +13,11 @@
   <tbody>
   {% for u in users %}
   <tr>
-    <td>{{ u.username }}</td>
+    <td><span class="row-user"><span class="row-avatar">{{ u.username[0]|upper }}</span>{{ u.username }}</span></td>
     <td>{{ u.display_name or '—' }}</td>
     <td>{{ u.email or '—' }}</td>
     <td><span class="badge badge-{{ u.state }}">{{ u.state }}</span></td>
-    <td>{% if u.is_admin %}<span style="color:var(--primary)">✓</span>{% endif %}</td>
+    <td>{% if u.is_admin %}<span style="color:var(--primary)">{{ icons.icon('check') }}</span>{% endif %}</td>
     <td class="row-actions">
       <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.admin_user_reset_password', user_id=u.id) }}">Reset Password</a>
       {% if u.id != session.user_id %}
