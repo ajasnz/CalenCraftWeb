@@ -141,6 +141,29 @@ def viewer(user_slug, calendar_slug, view_slug):
     )
 
 
+@public_bp.route("/embed/<user_slug>/<calendar_slug>/<view_slug>")
+def embed(user_slug, calendar_slug, view_slug):
+    """Minimal, iframe-friendly calendar view for embedding on third-party sites."""
+    cfg = _check_sharing(user_slug, calendar_slug, view_slug)
+    if cfg.get("viewer_password"):
+        # No login flow inside an iframe — password-protected calendars can't be embedded.
+        abort(403)
+
+    links = []
+    if cfg.get("viewer_links"):
+        try:
+            links = json.loads(cfg["viewer_links"])
+        except Exception:
+            pass
+
+    return render_template(
+        "embed_viewer.html",
+        cfg=cfg, user_slug=user_slug,
+        calendar_slug=calendar_slug, view_slug=view_slug,
+        links=links,
+    )
+
+
 @public_bp.route("/view/<user_slug>/<calendar_slug>/<view_slug>/events.json")
 def viewer_events(user_slug, calendar_slug, view_slug):
     cfg = _check_sharing(user_slug, calendar_slug, view_slug)

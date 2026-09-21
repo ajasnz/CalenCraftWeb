@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ cfg.viewer_title or cfg.title }}</title>
+  <link rel="stylesheet" href="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.css">
+  <script src="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js"></script>
+  {# Sanitise accent colour — only allow #rrggbb to prevent CSS injection #}
+  {% set _raw_color = cfg.viewer_color or '#00a9ff' %}
+  {% set _accent = _raw_color if _raw_color.startswith('#') and _raw_color|length == 7 else '#00a9ff' %}
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent:      {{ _accent }};
+      --accent-soft: color-mix(in srgb, {{ _accent }} 12%, white);
+      --surface: #ffffff;
+      --border:  #e2e8ec;
+      --text:    #12181c;
+      --muted:   #6b7680;
+      --radius-sm: 8px;
+    }
+    html, body { height: 100%; }
+    html { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--surface); color: var(--text); line-height: 1.5; font-size: 13px; overflow: hidden; }
+
+    .embed-wrap { display: flex; flex-direction: column; height: 100%; }
+    .embed-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .5rem .65rem; border-bottom: 1px solid var(--border); flex: 0 0 auto;
+    }
+    .nav-group { display: flex; align-items: center; gap: .35rem; }
+    .nav-btn {
+      width: 26px; height: 26px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); font-size: .9rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text);
+    }
+    .nav-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .today-btn { font-size: .55rem; font-weight: 600; }
+    .period-label { font-weight: 700; font-size: .82rem; min-width: 120px; text-align: center; }
+    .embed-brand { font-size: .68rem; color: var(--muted); text-decoration: none; }
+    .embed-brand:hover { color: var(--accent); }
+
+    .embed-cal { flex: 1 1 auto; position: relative; min-height: 0; }
+    #calendar { height: 100%; }
+
+    #cal-loading {
+      position: absolute; inset: 0; z-index: 100;
+      background: rgba(255,255,255,.85);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #cal-loading.hidden { display: none; }
+    .spinner {
+      width: 26px; height: 26px;
+      border: 3px solid #d3dce1; border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="embed-wrap">
+  <div class="embed-toolbar">
+    <div class="nav-group">
+      <button class="nav-btn" id="btn-prev" title="Previous">&#8249;</button>
+      <span class="period-label" id="period-label"></span>
+      <button class="nav-btn" id="btn-next" title="Next">&#8250;</button>
+      <button class="nav-btn today-btn" id="btn-today" title="Today">&#9679;</button>
+    </div>
+    <a class="embed-brand" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=calendar_slug, view_slug=view_slug) }}" target="_blank" rel="noopener">Full calendar ↗</a>
+  </div>
+  <div class="embed-cal">
+    <div id="cal-loading"><div class="spinner"></div></div>
+    <div id="calendar"></div>
+  </div>
+</div>
+
+<script>
+const EVENTS_URL = {{ url_for('public.viewer_events', user_slug=user_slug, calendar_slug=calendar_slug, view_slug=view_slug) | tojson }};
+const ACCENT = {{ _accent | tojson }};
+const DAYS_BEHIND = {{ (cfg.expansion_days_behind or 0) | int }};
+const DAYS_AHEAD  = {{ (cfg.expansion_days_ahead  or 180) | int }};
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtTime(date) { return pad(date.getHours()) + ':' + pad(date.getMinutes()); }
+
+const calendar = new tui.Calendar('#calendar', {
+  defaultView: 'month',
+  isReadOnly: true,
+  useDetailPopup: true,
+  usageStatistics: false,
+  week: { startDayOfWeek: 1, hourStart: 0, hourEnd: 24, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true },
+  month: { startDayOfWeek: 1, visibleWeeksCount: 6 },
+  template: {
+    time(event) {
+      const showTime = event.raw && event.raw.showTime;
+      return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title);
+    },
+    allday(event) { return event.title; },
+  },
+  calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
+});
+
+function setLoading(on) {
+  document.getElementById('cal-loading').classList.toggle('hidden', !on);
+}
+
+async function fetchAllEvents() {
+  const now = new Date();
+  const start = new Date(now); start.setDate(start.getDate() - DAYS_BEHIND);
+  const end   = new Date(now); end.setDate(end.getDate() + DAYS_AHEAD);
+  const url = EVENTS_URL
+    + '?start=' + encodeURIComponent(start.toISOString())
+    + '&end='   + encodeURIComponent(end.toISOString());
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const events = await res.json();
+    calendar.createEvents(events);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function updateLabel() {
+  const d = calendar.getDate().toDate();
+  document.getElementById('period-label').textContent = d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+document.getElementById('btn-prev').addEventListener('click', () => { calendar.prev(); updateLabel(); });
+document.getElementById('btn-next').addEventListener('click', () => { calendar.next(); updateLabel(); });
+document.getElementById('btn-today').addEventListener('click', () => { calendar.today(); updateLabel(); });
+
+updateLabel();
+fetchAllEvents();
+</script>
+</body>
+</html>

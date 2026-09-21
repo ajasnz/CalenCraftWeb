@@ -100,16 +100,24 @@ def create_app():
     # ── Security headers ────────────────────────────────────────────────
     @app.after_request
     def set_security_headers(response):
+        from flask import request
+
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = (
+        base_csp = (
             "default-src 'self'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://uicdn.toast.com; "
             "font-src 'self' https://fonts.gstatic.com https://uicdn.toast.com; "
             "img-src 'self' data:; "
             "script-src 'self' 'unsafe-inline' https://uicdn.toast.com;"
         )
+        # The embed viewer is meant to be framed on third-party sites, so it
+        # opts out of the app-wide same-origin framing restriction.
+        if request.path.startswith("/embed/"):
+            response.headers["Content-Security-Policy"] = base_csp + " frame-ancestors *;"
+        else:
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["Content-Security-Policy"] = base_csp + " frame-ancestors 'self';"
         return response
 
     return app

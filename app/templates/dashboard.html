@@ -29,7 +29,7 @@
     </div>
     <div class="cal-card-footer">
       <a class="btn btn-sm" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">Manage →</a>
-      {% if cal.share_viewer %}
+      {% if cal.share_viewer and cal.default_view_enabled %}
       <a class="btn btn-sm btn-ghost" href="{{ url_for('public.viewer', user_slug=session.get('user_slug', ''), calendar_slug=cal.slug, view_slug='default') }}" target="_blank" rel="noopener">View ↗</a>
       {% endif %}
     </div>

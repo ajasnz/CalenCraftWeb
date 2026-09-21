@@ -157,9 +157,80 @@
     </div>
   </fieldset>
 
-  <button type="submit" class="btn">{{ 'Save Changes' if rule else 'Create Rule' }}</button>
+  <div style="display:flex;gap:.6rem;align-items:center">
+    <button type="submit" class="btn">{{ 'Save Changes' if rule else 'Create Rule' }}</button>
+    <button type="button" class="btn btn-secondary" id="preview-btn" onclick="previewRule()">Preview effect</button>
+    <span id="preview-status" style="font-size:.85rem;color:var(--muted)"></span>
+  </div>
 </form>
 
+<div id="preview-panel" class="form-card" style="display:none;margin-top:1rem">
+  <div class="form-card-title">Live preview — next 60 days, against the Default view</div>
+  <div id="preview-summary" style="margin-bottom:.6rem;font-size:.9rem"></div>
+  <div id="preview-body"></div>
+</div>
+
+<script>
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderEventList(title, events) {
+  if (!events || !events.length) return '';
+  const rows = events.map(e =>
+    `<li>${new Date(e.start).toLocaleString()} — ${escapeHtml(e.summary || '(no title)')}</li>`
+  ).join('');
+  return `<div style="margin-top:.6rem"><strong>${title}</strong><ul style="margin:.3rem 0 0 1.1rem">${rows}</ul></div>`;
+}
+
+function renderChangedList(title, changes) {
+  if (!changes || !changes.length) return '';
+  const rows = changes.map(c =>
+    `<li>${new Date(c.after.start).toLocaleString()} — ${escapeHtml(c.before.summary || '(no title)')} → <strong>${escapeHtml(c.after.summary || '(no title)')}</strong></li>`
+  ).join('');
+  return `<div style="margin-top:.6rem"><strong>${title}</strong><ul style="margin:.3rem 0 0 1.1rem">${rows}</ul></div>`;
+}
+
+async function previewRule() {
+  const statusEl = document.getElementById('preview-status');
+  const panel = document.getElementById('preview-panel');
+  const summaryEl = document.getElementById('preview-summary');
+  const bodyEl = document.getElementById('preview-body');
+  statusEl.textContent = 'Running preview…';
+  panel.style.display = 'none';
+
+  syncHiddenFields();
+  const form = document.querySelector('form');
+  const fd = new FormData(form);
+  try {
+    const res = await fetch("{{ url_for('ui.rule_preview', calendar_slug=cal.slug) }}", {
+      method: 'POST', body: fd,
+    });
+    const data = await res.json();
+    statusEl.textContent = '';
+    if (data.error) {
+      summaryEl.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(data.error)}</span>`;
+      bodyEl.innerHTML = '';
+      panel.style.display = '';
+      return;
+    }
+    summaryEl.textContent = `${data.before_count} events today → ${data.after_count} events with this rule applied.`;
+    bodyEl.innerHTML =
+      renderChangedList('Events that would change', data.changed) +
+      renderEventList('Events that would be removed', data.removed) +
+      renderEventList('Events that would be added', data.added);
+    if (!data.changed.length && !data.removed.length && !data.added.length) {
+      bodyEl.innerHTML = '<p class="hint">No visible effect on upcoming events with the current source data.</p>';
+    }
+    panel.style.display = '';
+  } catch (e) {
+    statusEl.textContent = '';
+    summaryEl.innerHTML = `<span style="color:var(--danger,#dc2626)">Preview failed: ${escapeHtml(String(e))}</span>`;
+    bodyEl.innerHTML = '';
+    panel.style.display = '';
+  }
+}
+</script>
 <script>
 // Properties that have a fixed set of values
 const ENUM_PROPS = {{ property_enum_values | tojson }};
@@ -221,8 +292,8 @@ function updateTargetValueDisplay() {
   }
 }
 
-// On submit: copy active picker values into the canonical hidden fields
-document.querySelector('form').addEventListener('submit', function() {
+// Copy active picker values into the canonical hidden fields
+function syncHiddenFields() {
   const fp = document.getElementById('filter_property').value;
   if (fp === 'X-SOURCE-ID') {
     document.getElementById('filter_pattern').value = document.getElementById('filter_pattern_source').value;
@@ -235,7 +306,8 @@ document.querySelector('form').addEventListener('submit', function() {
   if ((tp in ENUM_PROPS) && action === 'replace') {
     document.getElementById('target_value').value = document.getElementById('target_value_enum').value;
   }
-});
+}
+document.querySelector('form').addEventListener('submit', syncHiddenFields);
 
 // Initialise on load
 (function() {

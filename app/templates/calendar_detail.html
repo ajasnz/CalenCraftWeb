@@ -10,21 +10,21 @@
   </div>
   <div class="cal-hero-links">
     {# Feed URL chip #}
-    {% if cal.share_ics %}
+    {% if cal.share_ics and cal.default_view_enabled %}
     <div class="url-chip">
       <span class="url-chip-label">Feed</span>
       <span class="url-chip-url" id="chip-feed-default">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</span>
       <button class="url-chip-btn" onclick="copyChip('chip-feed-default', this)" title="Copy feed URL">Copy</button>
     </div>
     {% else %}
-    <div class="url-chip" style="opacity:.55" title="Enable ICS sharing to activate">
+    <div class="url-chip" style="opacity:.55" title="{% if not cal.default_view_enabled %}Default view is disabled{% else %}Enable ICS sharing to activate{% endif %}">
       <span class="url-chip-label">Feed</span>
-      <span class="url-chip-url" style="color:var(--muted)">Sharing disabled</span>
-      <a class="url-chip-btn is-link" href="?tab=sharing">Enable →</a>
+      <span class="url-chip-url" style="color:var(--muted)">{% if not cal.default_view_enabled %}Default view disabled{% else %}Sharing disabled{% endif %}</span>
+      <a class="url-chip-btn is-link" href="?tab={{ 'advanced' if not cal.default_view_enabled else 'sharing' }}">Enable →</a>
     </div>
     {% endif %}
     {# Viewer URL chip #}
-    {% if cal.share_viewer %}
+    {% if cal.share_viewer and cal.default_view_enabled %}
     <div class="url-chip">
       <span class="url-chip-label">Viewer</span>
       <span class="url-chip-url" id="chip-viewer-default">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</span>
@@ -32,10 +32,10 @@
       <a class="url-chip-btn is-link" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" rel="noopener" title="Open public viewer">Open ↗</a>
     </div>
     {% else %}
-    <div class="url-chip" style="opacity:.55" title="Enable public viewer to activate">
+    <div class="url-chip" style="opacity:.55" title="{% if not cal.default_view_enabled %}Default view is disabled{% else %}Enable public viewer to activate{% endif %}">
       <span class="url-chip-label">Viewer</span>
-      <span class="url-chip-url" style="color:var(--muted)">Not enabled</span>
-      <a class="url-chip-btn is-link" href="?tab=sharing">Enable →</a>
+      <span class="url-chip-url" style="color:var(--muted)">{% if not cal.default_view_enabled %}Default view disabled{% else %}Not enabled{% endif %}</span>
+      <a class="url-chip-btn is-link" href="?tab={{ 'advanced' if not cal.default_view_enabled else 'sharing' }}">Enable →</a>
     </div>
     {% endif %}
   </div>
@@ -142,6 +142,12 @@
         <code id="viewer-{{ v.id }}">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/{{ v.slug }}</code>
         <button class="btn btn-sm btn-ghost" onclick="copyUrl('viewer-{{ v.id }}', this)">Copy</button>
         <a class="btn btn-sm btn-secondary" href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug=v.slug) }}" target="_blank" rel="noopener">Open</a>
+        {% if not v.viewer_password and not cal.viewer_password %}
+        {% set v_embed_url = request.host_url ~ "embed/" ~ user_slug ~ "/" ~ cal.slug ~ "/" ~ v.slug %}
+        {% set v_embed_code = '<iframe src="' ~ v_embed_url ~ '" style="width:100%;max-width:900px;height:650px;border:1px solid #e2e8ec;border-radius:12px" loading="lazy"></iframe>' %}
+        <code id="embed-{{ v.id }}" style="display:none">{{ v_embed_code }}</code>
+        <button class="btn btn-sm btn-ghost" onclick="copyUrl('embed-{{ v.id }}', this)" title="Copy embeddable iframe snippet">Embed</button>
+        {% endif %}
       </td>
       {% endif %}
       <td>
@@ -327,23 +333,43 @@
         <input type="checkbox" name="share_ics" {% if cal.share_ics %}checked{% endif %}>
         Allow ICS subscribe / download
       </label>
-      {% if cal.share_ics %}
+      {% if cal.share_ics and cal.default_view_enabled %}
       <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0">
         <strong>Feed URL:</strong>
         <code id="sharing-feed-url">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</code>
         <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('sharing-feed-url', this)">Copy</button>
+      </div>
+      {% elif cal.share_ics %}
+      <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0;color:var(--muted)">
+        Default view is disabled — <a href="?tab=advanced">enable it</a> to get a feed URL, or use a named view instead.
       </div>
       {% endif %}
       <label class="checkbox-label" style="margin-top:.75rem">
         <input type="checkbox" name="share_viewer" {% if cal.share_viewer %}checked{% endif %}>
         Enable public web viewer
       </label>
-      {% if cal.share_viewer %}
+      {% if cal.share_viewer and cal.default_view_enabled %}
       <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0">
         <strong>Viewer URL:</strong>
         <code id="sharing-viewer-url">{{ request.host_url }}view/{{ user_slug }}/{{ cal.slug }}/default</code>
         <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('sharing-viewer-url', this)">Copy</button>
         <a href="{{ url_for('public.viewer', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" class="btn btn-sm btn-secondary">Open</a>
+      </div>
+      {% if cal.viewer_password %}
+      <p class="hint" style="margin-top:.5rem">Embedding is disabled while this view has a password — remove it to get an embed snippet.</p>
+      {% else %}
+      {% set embed_url = request.host_url ~ "embed/" ~ user_slug ~ "/" ~ cal.slug ~ "/default" %}
+      {% set embed_code = '<iframe src="' ~ embed_url ~ '" style="width:100%;max-width:900px;height:650px;border:1px solid #e2e8ec;border-radius:12px" loading="lazy"></iframe>' %}
+      <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0">
+        <strong>Embed:</strong>
+        <code id="sharing-embed-code" style="white-space:pre-wrap;word-break:break-all">{{ embed_code }}</code>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('sharing-embed-code', this)">Copy snippet</button>
+        <a href="{{ url_for('public.embed', user_slug=user_slug, calendar_slug=cal.slug, view_slug='default') }}" target="_blank" class="btn btn-sm btn-secondary">Preview</a>
+      </div>
+      {% endif %}
+      {% elif cal.share_viewer %}
+      <div class="feed-url-box" style="margin-top:.5rem;margin-bottom:0;color:var(--muted)">
+        Default view is disabled — <a href="?tab=advanced">enable it</a> to get a viewer URL, or use a named view instead.
       </div>
       {% endif %}
     </div>

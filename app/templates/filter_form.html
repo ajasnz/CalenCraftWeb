@@ -107,11 +107,72 @@
     Include event if the property is absent
   </label>
 
-  <button type="submit" class="btn" style="margin-top:1.25rem">{{ 'Save Changes' if filter_ else 'Create Filter' }}</button>
+  <div style="display:flex;gap:.6rem;align-items:center;margin-top:1.25rem">
+    <button type="submit" class="btn">{{ 'Save Changes' if filter_ else 'Create Filter' }}</button>
+    <button type="button" class="btn btn-secondary" id="preview-btn" onclick="previewFilter()">Preview effect</button>
+    <span id="preview-status" style="font-size:.85rem;color:var(--muted)"></span>
+  </div>
 </form>
+
+<div id="preview-panel" class="form-card" style="display:none;margin-top:1rem">
+  <div class="form-card-title">Live preview — next 60 days, against the Default view</div>
+  <div id="preview-summary" style="margin-bottom:.6rem;font-size:.9rem"></div>
+  <div id="preview-body"></div>
+</div>
 
 <script>
 const ENUM_PROPS = {{ property_enum_values | tojson }};
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderEventList(title, events) {
+  if (!events || !events.length) return '';
+  const rows = events.map(e =>
+    `<li>${new Date(e.start).toLocaleString()} — ${escapeHtml(e.summary || '(no title)')}</li>`
+  ).join('');
+  return `<div style="margin-top:.6rem"><strong>${title}</strong><ul style="margin:.3rem 0 0 1.1rem">${rows}</ul></div>`;
+}
+
+async function previewFilter() {
+  const statusEl = document.getElementById('preview-status');
+  const panel = document.getElementById('preview-panel');
+  const summaryEl = document.getElementById('preview-summary');
+  const bodyEl = document.getElementById('preview-body');
+  statusEl.textContent = 'Running preview…';
+  panel.style.display = 'none';
+
+  syncHiddenFields();
+  const form = document.querySelector('form');
+  const fd = new FormData(form);
+  try {
+    const res = await fetch("{{ url_for('ui.filter_preview', calendar_slug=cal.slug) }}", {
+      method: 'POST', body: fd,
+    });
+    const data = await res.json();
+    statusEl.textContent = '';
+    if (data.error) {
+      summaryEl.innerHTML = `<span style="color:var(--danger,#dc2626)">${escapeHtml(data.error)}</span>`;
+      bodyEl.innerHTML = '';
+      panel.style.display = '';
+      return;
+    }
+    summaryEl.textContent = `${data.before_count} events today → ${data.after_count} events with this filter applied.`;
+    bodyEl.innerHTML =
+      renderEventList('Events that would be removed', data.removed) +
+      renderEventList('Events that would be added', data.added);
+    if (!data.removed.length && !data.added.length) {
+      bodyEl.innerHTML = '<p class="hint">No visible effect on upcoming events with the current source data.</p>';
+    }
+    panel.style.display = '';
+  } catch (e) {
+    statusEl.textContent = '';
+    summaryEl.innerHTML = `<span style="color:var(--danger,#dc2626)">Preview failed: ${escapeHtml(String(e))}</span>`;
+    bodyEl.innerHTML = '';
+    panel.style.display = '';
+  }
+}
 
 function refreshEnumSelect(selectEl, prop, currentVal) {
   while (selectEl.options.length > 1) selectEl.remove(1);
@@ -136,7 +197,7 @@ function onPropertyChange(sel) {
   if (isEnum) refreshEnumSelect(document.getElementById('pattern_enum'), v, '');
 }
 
-document.querySelector('form').addEventListener('submit', function() {
+function syncHiddenFields() {
   const prop = document.getElementById('property').value;
   if (prop === 'X-SOURCE-ID') {
     document.getElementById('pattern').value = document.getElementById('pattern_source').value;
@@ -147,7 +208,8 @@ document.querySelector('form').addEventListener('submit', function() {
     document.getElementById('pattern').removeAttribute('required');
     document.getElementById('type').value = 'equals';
   }
-});
+}
+document.querySelector('form').addEventListener('submit', syncHiddenFields);
 
 (function() { onPropertyChange(document.getElementById('property')); })();
 </script>

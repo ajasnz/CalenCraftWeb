@@ -260,14 +260,15 @@ class CalendarDB:
         cfg = dict(cal)
         if view_slug and view_slug != "default":
             view = self.get_view_by_slug(user_slug, calendar_slug, view_slug)
-            if view:
-                for key in ("share_ics", "share_viewer", "viewer_password",
-                            "viewer_title", "viewer_description", "viewer_color",
-                            "viewer_free_busy_only", "viewer_links",
-                            "viewer_show_time", "viewer_show_description", "viewer_show_location",
-                            "viewer_hide_private"):
-                    if view.get(key) is not None:
-                        cfg[key] = view[key]
+            if not view:
+                return None
+            for key in ("share_ics", "share_viewer", "viewer_password",
+                        "viewer_title", "viewer_description", "viewer_color",
+                        "viewer_free_busy_only", "viewer_links",
+                        "viewer_show_time", "viewer_show_description", "viewer_show_location",
+                        "viewer_hide_private"):
+                if view.get(key) is not None:
+                    cfg[key] = view[key]
         return cfg
 
     def update_calendar_sharing(self, calendar_id, share_ics, share_viewer, viewer_password,

@@ -1,11 +1,13 @@
 import re
 import json
+import datetime
 from functools import wraps
 from flask import (
     Blueprint, render_template, request, redirect, url_for,
     session, current_app, flash, abort, jsonify,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from app.classes.calendar import CalendarBuilder, ical_events_to_dicts
 
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
@@ -655,6 +657,84 @@ def filter_delete(calendar_slug, filter_id):
     db.delete_filter(filter_id)
     flash("Filter deleted.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="filters"))
+
+
+# ------------------------------------------------------------------
+# Live preview (rules/filters)
+# ------------------------------------------------------------------
+
+@ui_bp.route("/calendars/<calendar_slug>/rules/preview", methods=["POST"])
+@login_required
+def rule_preview(calendar_slug):
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    try:
+        draft = _rule_form_data(request.form)
+    except Exception:
+        return jsonify({"error": "Could not read the rule form."}), 400
+    return jsonify(_run_preview(cal, extra_rule=draft))
+
+
+@ui_bp.route("/calendars/<calendar_slug>/filters/preview", methods=["POST"])
+@login_required
+def filter_preview(calendar_slug):
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    try:
+        draft = _filter_form_data(request.form)
+        draft["property"] = draft.pop("property_")
+        draft["type"] = draft.pop("type_")
+    except Exception:
+        return jsonify({"error": "Could not read the filter form."}), 400
+    return jsonify(_run_preview(cal, extra_filter=draft))
+
+
+def _run_preview(cal, extra_rule=None, extra_filter=None):
+    """Build the calendar's default view before/after an unsaved rule or
+    filter, and return a small diff of upcoming events for display."""
+    now = datetime.datetime.utcnow()
+    start = now - datetime.timedelta(days=1)
+    end = now + datetime.timedelta(days=60)
+    builder = CalendarBuilder()
+    builder.db = current_app.db
+    try:
+        before_ical = builder.build(
+            user_slug=session["user_slug"], calendar_slug=cal["slug"], view_slug="default",
+            expansion_start=start, expansion_end=end,
+        )
+        after_ical = builder.build(
+            user_slug=session["user_slug"], calendar_slug=cal["slug"], view_slug="default",
+            expansion_start=start, expansion_end=end,
+            extra_rule=extra_rule, extra_filter=extra_filter,
+        )
+    except Exception as e:
+        return {"error": f"Could not build preview: {e}"}
+
+    before = ical_events_to_dicts(before_ical, start=start, end=end, limit=200)
+    after = ical_events_to_dicts(after_ical, start=start, end=end, limit=200)
+
+    before_by_uid = {e["uid"]: e for e in before if e["uid"]}
+    after_by_uid = {e["uid"]: e for e in after if e["uid"]}
+    removed = [e for uid, e in before_by_uid.items() if uid not in after_by_uid]
+    added = [e for uid, e in after_by_uid.items() if uid not in before_by_uid]
+    changed = [
+        {"before": before_by_uid[uid], "after": after_by_uid[uid]}
+        for uid in before_by_uid.keys() & after_by_uid.keys()
+        if before_by_uid[uid]["summary"] != after_by_uid[uid]["summary"]
+    ]
+
+    return {
+        "before_count": len(before),
+        "after_count": len(after),
+        "removed": sorted(removed, key=lambda e: e["start"])[:25],
+        "added": sorted(added, key=lambda e: e["start"])[:25],
+        "changed": sorted(changed, key=lambda c: c["after"]["start"])[:25],
+        "sample": after[:25],
+    }
 
 
 # ------------------------------------------------------------------

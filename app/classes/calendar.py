@@ -243,6 +243,8 @@ class CalendarBuilder:
         view_slug,
         expansion_start=None,
         expansion_end=None,
+        extra_rule=None,
+        extra_filter=None,
     ):
         """
         Build and return an aggregated iCalendar for the given identifiers.
@@ -252,8 +254,8 @@ class CalendarBuilder:
         - Ensures `self.db` is initialized by calling `_init_db()` if needed.
         - Fetches source calendars via `_fetch_source_events()`.
         - Loads rules and filters from `self.db` for sources, calendar,
-            and view, then applies filters and transformation rules to the
-            fetched events. Filters and rules may be scoped to a specific
+            and view, then applies transformation rules followed by filters
+            to the fetched events. Filters and rules may be scoped to a specific
             source (via `source_id`) or applied to all sources.
         - Tags each event with an `X-SOURCE-ID` property when merging.
         - Expands recurring events using `_expand_recurring_events(...)`.
@@ -307,6 +309,12 @@ class CalendarBuilder:
         all_filters = (
             self.filters["sources"] + self.filters["calendar"] + self.filters["view"]
         )
+        # extra_rule/extra_filter let callers preview an unsaved rule or filter
+        # (e.g. the dashboard's live preview) without persisting it first.
+        if extra_rule:
+            all_rules = all_rules + [extra_rule]
+        if extra_filter:
+            all_filters = all_filters + [extra_filter]
 
         merged_calendar = Calendar()
 
@@ -319,39 +327,6 @@ class CalendarBuilder:
         for source_id, events in events_by_source:
             for event in events:
                 event.add("X-SOURCE-ID", source_id)
-
-        for filter in all_filters:
-            source_id = filter.get("source_id")
-            if source_id:
-                for i, (sid, events) in enumerate(events_by_source):
-                    if sid == source_id:
-                        filtered_events = []
-                        for event in events:
-                            if self._apply_filter_to_event(
-                                event,
-                                filter["property"],
-                                filter["type"],
-                                filter["pattern"],
-                                filter["action"],
-                                include_if_fails=filter.get("include_if_fails", False),
-                            ):
-                                filtered_events.append(event)
-                        events_by_source[i] = (sid, filtered_events)
-            else:
-                # Apply to all sources
-                for i, (sid, events) in enumerate(events_by_source):
-                    filtered_events = []
-                    for event in events:
-                        if self._apply_filter_to_event(
-                            event,
-                            filter["property"],
-                            filter["type"],
-                            filter["pattern"],
-                            filter["action"],
-                            include_if_fails=filter.get("include_if_fails", False),
-                        ):
-                            filtered_events.append(event)
-                    events_by_source[i] = (sid, filtered_events)
 
         for rule in all_rules:
             source_id = rule.get("source_id")
@@ -394,6 +369,39 @@ class CalendarBuilder:
                         transformed_events.append(transformed_event)
                     events_by_source[i] = (sid, transformed_events)
 
+        for filter in all_filters:
+            source_id = filter.get("source_id")
+            if source_id:
+                for i, (sid, events) in enumerate(events_by_source):
+                    if sid == source_id:
+                        filtered_events = []
+                        for event in events:
+                            if self._apply_filter_to_event(
+                                event,
+                                filter["property"],
+                                filter["type"],
+                                filter["pattern"],
+                                filter["action"],
+                                include_if_fails=filter.get("include_if_fails", False),
+                            ):
+                                filtered_events.append(event)
+                        events_by_source[i] = (sid, filtered_events)
+            else:
+                # Apply to all sources
+                for i, (sid, events) in enumerate(events_by_source):
+                    filtered_events = []
+                    for event in events:
+                        if self._apply_filter_to_event(
+                            event,
+                            filter["property"],
+                            filter["type"],
+                            filter["pattern"],
+                            filter["action"],
+                            include_if_fails=filter.get("include_if_fails", False),
+                        ):
+                            filtered_events.append(event)
+                    events_by_source[i] = (sid, filtered_events)
+
         for source_id, events in events_by_source:
             for event in events:
                 merged_calendar.add_component(event)
@@ -410,3 +418,36 @@ class CalendarBuilder:
         for event in occurrences:
             final_calendar.add_component(event)
         return final_calendar.to_ical()
+
+
+def ical_events_to_dicts(ical_bytes, start=None, end=None, limit=None):
+    """
+    Parse VEVENTs out of `ical_bytes` into plain dicts for display purposes
+    (e.g. a live rule/filter preview). Optionally restricted to events whose
+    start falls within [start, end), and capped to `limit` events.
+    """
+    events = []
+    cal = Calendar.from_ical(ical_bytes)
+    for component in cal.walk():
+        if component.name != "VEVENT":
+            continue
+        dtstart = component.get("DTSTART")
+        if not dtstart:
+            continue
+        raw = dtstart.dt
+        dt = raw if isinstance(raw, datetime.datetime) else datetime.datetime.combine(raw, datetime.time.min)
+        if dt.tzinfo is not None:
+            dt = dt.replace(tzinfo=None)
+        if start and dt < start:
+            continue
+        if end and dt >= end:
+            continue
+        events.append({
+            "uid": str(component.get("UID", "")),
+            "summary": str(component.get("SUMMARY", "")),
+            "location": str(component.get("LOCATION", "")),
+            "start": dt.isoformat(),
+            "is_allday": isinstance(raw, datetime.date) and not isinstance(raw, datetime.datetime),
+        })
+    events.sort(key=lambda e: e["start"])
+    return events[:limit] if limit else events
