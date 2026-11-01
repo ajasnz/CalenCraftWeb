@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import '_icons.html' as icons %}
+{% block title %}Import preview — CalenCraft{% endblock %}
+{% block content %}
+<a class="back-link" href="{{ url_for('ui.calendar_new') }}">{{ icons.icon('chevron-left') }} Back</a>
+<div class="page-header"><h2>Import preview</h2></div>
+
+<div class="form-card">
+  <div class="form-card-title">Will be created as “{{ new_title }}”</div>
+  <ul class="import-summary">
+    <li><strong>{{ clean.sources|length }}</strong> source{{ '' if clean.sources|length == 1 else 's' }}</li>
+    <li><strong>{{ clean.views|length }}</strong> view{{ '' if clean.views|length == 1 else 's' }}{% if clean.views %}: {{ clean.views|map(attribute='slug')|join(', ') }}{% endif %}</li>
+    <li><strong>{{ clean.filters|length }}</strong> filter{{ '' if clean.filters|length == 1 else 's' }}</li>
+    <li><strong>{{ clean.rules|length }}</strong> rule{{ '' if clean.rules|length == 1 else 's' }}</li>
+  </ul>
+
+  {% if clean.sources %}
+  <p class="hint" style="margin:.9rem 0 .35rem">Sources it will fetch from:</p>
+  <ul class="import-sources">
+    {% for s in clean.sources %}<li><code>{{ s.url }}</code>{% if not s.enabled %} <span class="badge badge-disabled">disabled</span>{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% for w in warnings %}<div class="import-warning">{{ w }}</div>{% endfor %}
+
+  <form method="post" action="{{ url_for('ui.calendar_import_confirm') }}" style="margin-top:1.1rem;display:flex;gap:.6rem">
+    <textarea name="payload" hidden>{{ payload }}</textarea>
+    <button type="submit" class="btn">Import calendar</button>
+    <a class="btn btn-ghost" href="{{ url_for('ui.calendar_new') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

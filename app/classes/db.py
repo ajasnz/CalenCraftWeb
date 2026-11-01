@@ -239,6 +239,53 @@ class CalendarDB:
     def delete_calendar(self, calendar_id):
         self._execute(self._named("calendar_delete"), (calendar_id,))
 
+    def import_calendar(self, user_id, clean, slug, title):
+        """Create a calendar from a config validated by config_import. All-or-nothing.
+
+        Column names come from the validator's whitelist, never from the file itself.
+        """
+        from app.functions import config_import as ci
+
+        def insert(table, values):
+            cols = list(values)
+            sql = "INSERT INTO {} ({}) VALUES ({})".format(table, ", ".join(cols), ", ".join("?" * len(cols)))
+            return self._execute(sql, [values[c] for c in cols], commit=False)
+
+        try:
+            fields = {k: v for k, v in clean["calendar"].items() if k in ci.CAL_FIELDS}
+            cal_id = insert("calendars", {"user_id": user_id, "slug": slug, "title": title, **fields})
+
+            source_ids = {}
+            for s in clean["sources"]:
+                sid = insert("sources", {"user_id": user_id, "url": s["url"], "name": s["name"], "enabled": s["enabled"]})
+                self._execute("INSERT INTO calendar_sources (calendar_id, source_id) VALUES (?, ?)",
+                              (cal_id, sid), commit=False)
+                source_ids.setdefault(s["name"], sid)      # first source wins on duplicate names
+
+            view_ids = {}
+            for v in clean["views"]:
+                overrides = {k: x for k, x in v["overrides"].items() if k in ci.VIEW_FIELDS}
+                view_ids[v["slug"]] = insert("views", {"calendar_id": cal_id, "slug": v["slug"],
+                                                       "title": v["title"], **overrides})
+
+            for f in clean["filters"]:
+                insert("filters", {"calendar_id": cal_id, "view_id": view_ids.get(f["view"]),
+                                   "source_id": source_ids.get(f["source"]), "priority": f["priority"],
+                                   "property": f["property"], "type": f["type"], "pattern": f["pattern"],
+                                   "action": f["action"], "include_if_fails": f["include_if_fails"]})
+            for r in clean["rules"]:
+                insert("rules", {"calendar_id": cal_id, "view_id": view_ids.get(r["view"]),
+                                 "source_id": source_ids.get(r["source"]), "priority": r["priority"],
+                                 "filter_property": r["filter_property"], "filter_type": r["filter_type"],
+                                 "filter_pattern": r["filter_pattern"], "filter_action": r["filter_action"],
+                                 "include_if_fails": r["include_if_fails"], "target_property": r["target_property"],
+                                 "action": r["action"], "target_value": r["target_value"]})
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return cal_id
+
     def duplicate_calendar(self, calendar_id, new_slug, new_title):
         """Copy a calendar with its settings, sources, views, filters and rules.
 

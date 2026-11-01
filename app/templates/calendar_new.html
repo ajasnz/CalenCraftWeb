@@ -13,4 +13,20 @@
     <button type="submit" class="btn">Create Calendar</button>
   </form>
 </div>
+
+<div class="form-card" id="import">
+  <div class="form-card-title">Import from a backup</div>
+  <p class="hint" style="margin-bottom:.8rem">Restore a calendar from a JSON file exported with “Export configuration”. You'll see a preview first, and nothing is overwritten: it's always created as a new calendar.</p>
+  {% if import_errors %}
+  <div class="flash flash-error" style="display:block">
+    <strong>That file can't be imported:</strong>
+    <ul style="margin:.4rem 0 0 1.1rem">{% for e in import_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  <form method="post" action="{{ url_for('ui.calendar_import') }}" enctype="multipart/form-data">
+    <label for="import-file">Export file (.json)</label>
+    <input id="import-file" name="file" type="file" accept="application/json,.json" required>
+    <button type="submit" class="btn btn-ghost">Preview import</button>
+  </form>
+</div>
 {% endblock %}

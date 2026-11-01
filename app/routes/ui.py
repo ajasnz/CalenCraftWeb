@@ -314,6 +314,71 @@ def calendar_detail(calendar_slug):
     )
 
 
+def _validate_uploaded_config(raw_text):
+    from app.functions import config_import as ci
+    try:
+        data = json.loads(raw_text)
+    except ValueError:
+        return None, [], ["That file isn't valid JSON."]
+    return ci.validate_config(
+        data, url_validator=_validate_source_url, slugify=slugify, sanitize_color=_sanitize_color,
+        filter_types=set(FILTER_TYPES), filter_actions=set(FILTER_ACTIONS), rule_actions=set(RULE_ACTIONS))
+
+
+def _unique_import_title(db, title):
+    existing = {c["slug"] for c in db.get_calendars(session["user_id"])}
+    candidate, n = title, 1
+    while not slugify(candidate) or slugify(candidate) in existing:
+        n += 1
+        candidate = f"{title} (imported)" if n == 2 else f"{title} (imported) {n - 1}"
+    return candidate
+
+
+@ui_bp.route("/calendars/import", methods=["POST"])
+@login_required
+def calendar_import():
+    """Step 1: upload an export file, validate it, and show what would be created."""
+    from app.functions import config_import as ci
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        flash("Choose an export file to import.", "error")
+        return redirect(url_for("ui.calendar_new"))
+    raw = upload.stream.read(ci.MAX_BYTES + 1)
+    if len(raw) > ci.MAX_BYTES:
+        flash(f"That file is too large (limit {ci.MAX_BYTES // 1000} KB).", "error")
+        return redirect(url_for("ui.calendar_new"))
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        flash("That file isn't UTF-8 text.", "error")
+        return redirect(url_for("ui.calendar_new"))
+    clean, warnings, errors = _validate_uploaded_config(text)
+    if errors:
+        return render_template("calendar_new.html", nav_calendars=_nav_calendars(), import_errors=errors), 400
+    title = _unique_import_title(current_app.db, clean["title"])
+    return render_template("calendar_import_preview.html", nav_calendars=_nav_calendars(),
+                           clean=clean, warnings=warnings, new_title=title, payload=text)
+
+
+@ui_bp.route("/calendars/import/confirm", methods=["POST"])
+@login_required
+def calendar_import_confirm():
+    """Step 2: re-validate the same file server-side, then create the calendar atomically."""
+    clean, _warnings, errors = _validate_uploaded_config(request.form.get("payload", ""))
+    if errors:
+        return render_template("calendar_new.html", nav_calendars=_nav_calendars(), import_errors=errors), 400
+    db = current_app.db
+    title = _unique_import_title(db, clean["title"])
+    try:
+        db.import_calendar(session["user_id"], clean, slugify(title), title)
+    except Exception:
+        current_app.logger.exception("Calendar import failed")
+        flash("The import failed and nothing was created.", "error")
+        return redirect(url_for("ui.calendar_new"))
+    flash(f"Imported “{title}”. Sources have not been fetched yet — use Refresh now on the Sources tab.", "success")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
+
+
 @ui_bp.route("/calendars/<calendar_slug>/duplicate", methods=["POST"])
 @login_required
 def calendar_duplicate(calendar_slug):
