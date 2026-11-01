@@ -76,7 +76,7 @@ queries = {
 
     # --- Sources ---
     "sources_for_calendar": """
-        SELECT s.id, s.url, s.name, s.enabled
+        SELECT s.id, s.url, s.name, s.enabled, s.last_fetch_ok
         FROM sources s
         JOIN calendar_sources cs ON cs.source_id = s.id
         WHERE cs.calendar_id = ?

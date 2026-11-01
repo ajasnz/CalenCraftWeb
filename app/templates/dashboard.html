@@ -14,9 +14,17 @@
   <div class="stat"><div class="stat-n">{{ calendars|sum(attribute='view_count') }}</div><div class="stat-l">Views</div></div>
   <div class="stat"><div class="stat-n">{{ calendars|selectattr('share_viewer')|list|length }}</div><div class="stat-l">Public viewers</div></div>
 </div>
-<div class="cal-grid">
+<div class="dash-tools">
+  <label class="dash-search">
+    {{ icons.icon('search') }}
+    <span class="sr-only">Search calendars</span>
+    <input type="search" id="cal-search" placeholder="Search calendars…" autocomplete="off">
+    <kbd>/</kbd>
+  </label>
+</div>
+<div class="cal-grid" id="cal-grid">
   {% for cal in calendars %}
-  <div class="cal-card">
+  <div class="cal-card" data-name="{{ (cal.title ~ ' ' ~ cal.slug)|lower }}">
     <div class="cal-card-body">
       <div class="cal-card-title">{{ cal.title }}</div>
       <div class="cal-card-slug">{{ cal.slug }}</div>
@@ -25,7 +33,14 @@
         <span class="cal-stat"><span class="cal-stat-icon">{{ icons.icon('grid') }}</span> {{ cal.view_count }} view{{ 's' if cal.view_count != 1 }}</span>
         {% if cal.share_ics %}<span class="cal-badge cal-badge-ics">ICS</span>{% endif %}
         {% if cal.share_viewer %}<span class="cal-badge cal-badge-viewer">Viewer</span>{% endif %}
+        {% if cal.failing_sources %}<span class="cal-badge cal-badge-warn" title="Last fetch failed for {{ cal.failing_sources }} source(s)">{{ cal.failing_sources }} failing</span>{% endif %}
       </div>
+      {% if cal.share_ics and cal.default_view_enabled %}
+      <div class="cal-card-url">
+        <code>/feed/{{ session.get('user_slug','') }}/{{ cal.slug }}/default</code>
+        <button type="button" class="btn btn-sm btn-ghost" data-copy="{{ request.host_url }}feed/{{ session.get('user_slug','') }}/{{ cal.slug }}/default">Copy</button>
+      </div>
+      {% endif %}
     </div>
     <div class="cal-card-footer">
       <a class="btn btn-sm" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">Manage →</a>
@@ -36,6 +51,27 @@
   </div>
   {% endfor %}
 </div>
+<p class="no-results" id="no-results">No calendars match your search.</p>
+<script>
+(function () {
+  var input = document.getElementById('cal-search'), cards = document.querySelectorAll('#cal-grid .cal-card'), none = document.getElementById('no-results');
+  input.addEventListener('input', function () {
+    var q = input.value.trim().toLowerCase(), shown = 0;
+    cards.forEach(function (c) { var m = !q || c.dataset.name.indexOf(q) !== -1; c.style.display = m ? '' : 'none'; if (m) shown++; });
+    none.style.display = shown ? 'none' : 'block';
+  });
+  document.addEventListener('keydown', function (e) {
+    var tag = document.activeElement.tagName;
+    if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') { e.preventDefault(); input.focus(); }
+    if (e.key === 'Escape' && document.activeElement === input) { input.value = ''; input.dispatchEvent(new Event('input')); input.blur(); }
+  });
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      navigator.clipboard.writeText(b.dataset.copy).then(function () { toast('Feed URL copied'); }, function () { toast('Copy failed'); });
+    });
+  });
+})();
+</script>
 {% else %}
 <div class="empty-state">
   <span class="empty-icon">{{ icons.icon('calendar-big') }}</span>
