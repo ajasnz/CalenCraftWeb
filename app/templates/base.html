@@ -19,12 +19,13 @@
   <style>body { font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }</style>
 </head>
 <body class="{% if session.user_id %}has-nav{% endif %}">
+<a class="skip-link" href="#main">Skip to content</a>
 
 {% if session.user_id %}
 {% set _username = session.get('user_slug', '') %}
 {% set _initial = _username[0] | upper if _username else '?' %}
 
-<nav class="sidebar" id="sidebar">
+<nav class="sidebar" id="sidebar" aria-label="Main">
   <div class="sidebar-header">
     <a class="brand" href="{{ url_for('ui.dashboard') }}">CalenCraft</a>
     <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close">{{ icons.icon('x') }}</button>
@@ -84,7 +85,7 @@
 {% endif %}
 
 <div class="page-wrap">
-  <main>
+  <main id="main" tabindex="-1">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
         <div class="flash flash-{{ category }}">{{ message }}</div>

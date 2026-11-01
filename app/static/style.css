@@ -821,3 +821,18 @@ kbd {
 .cal-badge-warn { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
 .no-results { text-align: center; color: var(--muted); padding: 2rem 0; display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+/* ── Accessibility ── */
+.skip-link {
+  position: fixed; top: -3rem; left: .75rem; z-index: 2000;
+  background: var(--primary); color: #fff; padding: .5rem .9rem; border-radius: var(--radius-sm);
+  font-weight: 600; transition: top .15s;
+}
+.skip-link:focus { top: .6rem; color: #fff; text-decoration: none; }
+main:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.btn:focus-visible, .sidebar-item:focus-visible, .tab:focus-visible { outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .cal-card:hover { transform: none; }
+}
