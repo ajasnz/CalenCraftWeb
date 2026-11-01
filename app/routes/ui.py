@@ -679,6 +679,38 @@ def filter_delete(calendar_slug, filter_id):
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="filters"))
 
 
+@ui_bp.route("/calendars/<calendar_slug>/upcoming.json")
+@login_required
+def calendar_upcoming(calendar_slug):
+    """Upcoming events as the given view's feed would serve them (read-only preview)."""
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    view_slug = request.args.get("view", "default")
+    if view_slug != "default" and not db.get_view_by_slug(session["user_slug"], calendar_slug, view_slug):
+        abort(404)
+    try:
+        days = max(1, min(int(request.args.get("days", 30)), 90))
+    except ValueError:
+        days = 30
+
+    now = datetime.datetime.utcnow()
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + datetime.timedelta(days=days)
+    builder = CalendarBuilder()
+    builder.db = db
+    try:
+        ical = builder.build(
+            user_slug=session["user_slug"], calendar_slug=calendar_slug, view_slug=view_slug,
+            expansion_start=start, expansion_end=end,
+        )
+    except Exception as e:
+        return jsonify({"error": f"Could not build preview: {e}"}), 200
+    events = ical_events_to_dicts(ical, start=start, end=end, limit=300)
+    return jsonify({"events": events, "days": days, "view": view_slug})
+
+
 # ------------------------------------------------------------------
 # Live preview (rules/filters)
 # ------------------------------------------------------------------
