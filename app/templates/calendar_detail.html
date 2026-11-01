@@ -45,10 +45,23 @@
 </div>
 
 <div class="tabs" id="tabs">
-  {% for tid, label in [('sources','Sources'),('views','Views'),('filters','Filters'),('rules','Rules'),('sharing','Sharing'),('advanced','Advanced')] %}
+  {% for tid, label in [('sources','Sources'),('views','Views'),('filters','Filters'),('rules','Rules'),('preview','Preview'),('sharing','Sharing'),('advanced','Advanced')] %}
   <a class="tab {% if active_tab == tid %}active{% endif %}" href="?tab={{ tid }}" onclick="showTab('{{ tid }}',this,event)">{{ label }}</a>
   {% endfor %}
 </div>
+
+{# ── PREVIEW ── #}
+<section class="tab-panel {% if active_tab != 'preview' %}hidden{% endif %}" id="tab-preview">
+  <div class="section-header">
+    <h3>Upcoming events</h3>
+    <select id="preview-view" aria-label="View to preview">
+      <option value="default">Default view</option>
+      {% for v in views %}<option value="{{ v.slug }}">{{ v.title }}</option>{% endfor %}
+    </select>
+  </div>
+  <p class="hint" style="margin-bottom:.875rem">The next 30 days exactly as subscribers will see them — after all filters and rules.</p>
+  <div id="preview-body" class="preview-body"><p class="hint">Open this tab to load a preview.</p></div>
+</section>
 
 {# ── SOURCES ── #}
 <section class="tab-panel {% if active_tab != 'sources' %}hidden{% endif %}" id="tab-sources">
@@ -521,10 +534,19 @@
   background: var(--primary-bg); color: var(--primary);
   border-color: #c7d2fe;
 }
+#preview-view { width: auto; min-width: 12rem; }
+.preview-body { max-width: 760px; }
+.pv-day { margin-bottom: 1rem; }
+.pv-day-h { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: .3rem 0; border-bottom: 1px solid var(--border); margin-bottom: .3rem; }
+.pv-ev { display: flex; gap: .75rem; align-items: baseline; padding: .3rem 0; font-size: .88rem; }
+.pv-time { flex: 0 0 4.2rem; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8rem; }
+.pv-title { font-weight: 600; color: var(--text); }
+.pv-loc { color: var(--muted); font-size: .8rem; margin-left: auto; text-align: right; max-width: 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-title { min-width: 0; overflow-wrap: anywhere; }
 </style>
 
 <script>
-const TABS = ['sources','views','filters','rules','sharing','advanced'];
+const TABS = ['sources','views','filters','rules','preview','sharing','advanced'];
 
 (function() {
   const active = {{ active_tab | tojson }};
@@ -537,7 +559,34 @@ const TABS = ['sources','views','filters','rules','sharing','advanced'];
   });
 })();
 
+let previewLoaded = false;
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function loadPreview() {
+  const body = document.getElementById('preview-body');
+  body.innerHTML = '<p class="hint">Loading…</p>';
+  try {
+    const view = document.getElementById('preview-view').value;
+    const r = await fetch('{{ url_for("ui.calendar_upcoming", calendar_slug=cal.slug) }}?view=' + encodeURIComponent(view));
+    const d = await r.json();
+    if (d.error) { body.innerHTML = '<p class="hint" style="color:var(--danger)">' + esc(d.error) + '</p>'; return; }
+    if (!d.events.length) { body.innerHTML = '<p class="hint">No events in the next ' + d.days + ' days for this view.</p>'; return; }
+    const groups = {};
+    d.events.forEach(e => { (groups[e.start.slice(0, 10)] = groups[e.start.slice(0, 10)] || []).push(e); });
+    body.innerHTML = Object.keys(groups).sort().map(day => {
+      const label = new Date(day + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+      return '<div class="pv-day"><div class="pv-day-h">' + esc(label) + '</div>' + groups[day].map(e =>
+        '<div class="pv-ev"><span class="pv-time">' + (e.is_allday ? 'All day' : esc(e.start.slice(11, 16))) + '</span>' +
+        '<span class="pv-title">' + esc(e.summary || '(no title)') + '</span>' +
+        (e.location ? '<span class="pv-loc">' + esc(e.location) + '</span>' : '') + '</div>').join('') + '</div>';
+    }).join('');
+    previewLoaded = true;
+  } catch (err) { body.innerHTML = '<p class="hint" style="color:var(--danger)">Preview failed.</p>'; }
+}
+document.getElementById('preview-view').addEventListener('change', loadPreview);
+{% if active_tab == 'preview' %}loadPreview();{% endif %}
+
 function showTab(id, el, event) {
+  if (id === 'preview' && !previewLoaded) loadPreview();
   if (event) event.preventDefault();
   TABS.forEach(tid => document.getElementById('tab-' + tid).classList.toggle('hidden', tid !== id));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
