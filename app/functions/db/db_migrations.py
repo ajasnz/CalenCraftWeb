@@ -209,4 +209,25 @@ migrations = {
             CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id, id);
         """,
     },
+    8: {
+        "id": 8,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Event-level overrides",
+        "description": "Hide or rename a single event (one occurrence or a whole series), optionally per view, without writing a rule.",
+        "sql": """
+            CREATE TABLE IF NOT EXISTS event_overrides (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                calendar_id INTEGER NOT NULL REFERENCES calendars(id),
+                view_slug TEXT,
+                event_uid TEXT NOT NULL,
+                instance_start TEXT,
+                action TEXT NOT NULL,
+                new_title TEXT,
+                label TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_event_overrides_calendar ON event_overrides(calendar_id);
+        """,
+    },
 }

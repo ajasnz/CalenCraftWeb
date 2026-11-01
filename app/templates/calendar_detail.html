@@ -624,6 +624,20 @@
 .pv-title { font-weight: 600; color: var(--text); }
 .pv-loc { color: var(--muted); font-size: .8rem; margin-left: auto; text-align: right; max-width: 45%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv-title { min-width: 0; overflow-wrap: anywhere; }
+.pv-actions { margin-left: .5rem; white-space: nowrap; opacity: .0; transition: opacity .12s; }
+.pv-ev:hover .pv-actions, .pv-ev:focus-within .pv-actions, .pv-changes .pv-actions { opacity: 1; }
+@media (hover: none) { .pv-actions { opacity: 1; } }
+.pv-act { background: none; border: none; color: var(--primary); font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; padding: .1rem .35rem; }
+.pv-act:hover { text-decoration: underline; }
+.pv-hidden .pv-title { text-decoration: line-through; color: var(--muted); }
+.pv-badge { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .1em .5em; border-radius: 99px; background: var(--warning-bg); color: var(--warning); margin-left: .35rem; text-decoration: none; display: inline-block; }
+.pv-was { color: var(--muted); font-size: .76rem; font-weight: 500; margin-left: .35rem; }
+.pv-form { display: flex; flex-wrap: wrap; gap: .6rem .9rem; align-items: end; padding: .7rem .9rem; margin: .2rem 0 .6rem 4.2rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.pv-form label { display: flex; flex-direction: column; gap: .2rem; font-size: .74rem; font-weight: 700; color: var(--muted); }
+.pv-form input, .pv-form select { width: auto; min-width: 11rem; font-size: .82rem; padding: .35rem .5rem; }
+.pv-form-btns { display: flex; gap: .4rem; }
+.pv-err { color: var(--danger); font-size: .78rem; flex-basis: 100%; }
+.pv-changes { margin-top: 1.6rem; }
 </style>
 
 <script>
@@ -642,27 +656,98 @@ const TABS = ['sources','views','filters','rules','preview','sharing','advanced'
 
 let previewLoaded = false;
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let pvEvents = [];
+const PV_URL = '{{ url_for("ui.calendar_upcoming", calendar_slug=cal.slug) }}';
+const PV_OVERRIDE_URL = '{{ url_for("ui.event_override_create", calendar_slug=cal.slug) }}';
+const PV_DELETE_URL = id => '{{ url_for("ui.calendar_detail", calendar_slug=cal.slug) }}/overrides/' + id + '/delete';
+function pvView() { return document.getElementById('preview-view').value; }
+function pvViewName() { const s = document.getElementById('preview-view'); return s.options[s.selectedIndex].text.replace(/ view$/i, ''); }
+function pvPost(url, data) { return fetch(url, { method: 'POST', body: new URLSearchParams(data) }).then(r => r.json()); }
+function pvWhen(o) { return (o.scope === 'this' && o.start ? 'on ' + new Date(o.start).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'every occurrence') + ' · ' + (o.view ? 'in ' + esc(o.view === 'default' ? 'Default view' : o.view) + ' only' : 'in every view'); }
+
+function pvRow(e, i) {
+  const o = e.override;
+  const title = o && o.action === 'rename'
+    ? esc(o.new_title) + ' <span class="pv-was">was: ' + esc(e.summary || '(no title)') + '</span>'
+    : esc(e.summary || '(no title)');
+  const badge = o ? '<span class="pv-badge">' + (o.action === 'hide' ? 'Hidden from feed' : 'Renamed') + '</span>' : '';
+  const actions = !e.uid ? '' : o
+    ? '<button type="button" class="pv-act" data-act="restore" data-id="' + o.id + '">Restore</button>'
+    : '<button type="button" class="pv-act" data-act="hide" data-i="' + i + '">Hide</button><button type="button" class="pv-act" data-act="rename" data-i="' + i + '">Rename</button>';
+  return '<div class="pv-ev' + (o && o.action === 'hide' ? ' pv-hidden' : '') + '" data-row="' + i + '">' +
+    '<span class="pv-time">' + (e.is_allday ? 'All day' : esc(e.start.slice(11, 16))) + '</span>' +
+    '<span class="pv-title">' + title + ' ' + badge + '</span>' +
+    (e.location ? '<span class="pv-loc">' + esc(e.location) + '</span>' : '') +
+    '<span class="pv-actions">' + actions + '</span></div>';
+}
+
+function pvForm(e, i, action) {
+  const rename = action === 'rename';
+  return '<form class="pv-form" data-i="' + i + '" data-action="' + action + '">' +
+    (rename ? '<label>New title<input name="title" type="text" maxlength="200" required value="' + esc(e.summary) + '"></label>' : '') +
+    '<label>Applies to<select name="scope"><option value="this">This event only</option><option value="all">Every occurrence (the whole series)</option></select></label>' +
+    '<label>Where<select name="viewscope"><option value="view">Only in ' + esc(pvViewName()) + (pvView() === 'default' ? ' view' : '') + '</option><option value="all">In every view</option></select></label>' +
+    '<span class="pv-form-btns"><button class="btn btn-sm">' + (rename ? 'Save title' : 'Hide event') + '</button>' +
+    '<button type="button" class="btn btn-sm btn-ghost" data-act="cancel">Cancel</button></span><span class="pv-err"></span></form>';
+}
+
 async function loadPreview() {
   const body = document.getElementById('preview-body');
   body.innerHTML = '<p class="hint">Loading…</p>';
   try {
-    const view = document.getElementById('preview-view').value;
-    const r = await fetch('{{ url_for("ui.calendar_upcoming", calendar_slug=cal.slug) }}?view=' + encodeURIComponent(view));
+    const r = await fetch(PV_URL + '?view=' + encodeURIComponent(pvView()));
     const d = await r.json();
     if (d.error) { body.innerHTML = '<p class="hint" style="color:var(--danger)">' + esc(d.error) + '</p>'; return; }
-    if (!d.events.length) { body.innerHTML = '<p class="hint">No events in the next ' + d.days + ' days for this view.</p>'; return; }
-    const groups = {};
-    d.events.forEach(e => { (groups[e.start.slice(0, 10)] = groups[e.start.slice(0, 10)] || []).push(e); });
-    body.innerHTML = Object.keys(groups).sort().map(day => {
-      const label = new Date(day + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-      return '<div class="pv-day"><div class="pv-day-h">' + esc(label) + '</div>' + groups[day].map(e =>
-        '<div class="pv-ev"><span class="pv-time">' + (e.is_allday ? 'All day' : esc(e.start.slice(11, 16))) + '</span>' +
-        '<span class="pv-title">' + esc(e.summary || '(no title)') + '</span>' +
-        (e.location ? '<span class="pv-loc">' + esc(e.location) + '</span>' : '') + '</div>').join('') + '</div>';
-    }).join('');
+    pvEvents = d.events;
+    let html = '';
+    if (!d.events.length) {
+      html = '<p class="hint">No events in the next ' + d.days + ' days for this view.</p>';
+    } else {
+      const groups = {};
+      d.events.forEach((e, i) => { (groups[e.start.slice(0, 10)] = groups[e.start.slice(0, 10)] || []).push([e, i]); });
+      html = Object.keys(groups).sort().map(day => {
+        const label = new Date(day + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+        return '<div class="pv-day"><div class="pv-day-h">' + esc(label) + '</div>' + groups[day].map(([e, i]) => pvRow(e, i)).join('') + '</div>';
+      }).join('');
+    }
+    if (d.overrides.length) {
+      html += '<div class="pv-changes"><div class="pv-day-h">Manual changes (' + d.overrides.length + ')</div>' + d.overrides.map(o =>
+        '<div class="pv-ev"><span class="pv-title">' + (o.action === 'hide' ? 'Hidden: ' : 'Renamed to “' + esc(o.new_title) + '”: ') + esc(o.label || o.uid) +
+        ' <span class="pv-was">' + pvWhen(o) + '</span></span><span class="pv-actions"><button type="button" class="pv-act" data-act="restore" data-id="' + o.id + '">Restore</button></span></div>').join('') + '</div>';
+    }
+    body.innerHTML = html;
     previewLoaded = true;
   } catch (err) { body.innerHTML = '<p class="hint" style="color:var(--danger)">Preview failed.</p>'; }
 }
+
+document.getElementById('preview-body').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-act]');
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'cancel') { const f = b.closest('form'); if (f) f.remove(); return; }
+  if (act === 'restore') {
+    b.disabled = true;
+    await pvPost(PV_DELETE_URL(b.dataset.id), {});
+    return loadPreview();
+  }
+  if (act === 'hide' || act === 'rename') {
+    document.querySelectorAll('.pv-form').forEach(f => f.remove());
+    const i = +b.dataset.i, row = document.querySelector('[data-row="' + i + '"]');
+    row.insertAdjacentHTML('afterend', pvForm(pvEvents[i], i, act));
+    const first = row.nextElementSibling.querySelector('input,select'); if (first) first.focus();
+  }
+});
+document.getElementById('preview-body').addEventListener('submit', async ev => {
+  const f = ev.target.closest('.pv-form');
+  if (!f) return;
+  ev.preventDefault();
+  const e = pvEvents[+f.dataset.i], fd = new FormData(f), scope = fd.get('scope');
+  const res = await pvPost(PV_OVERRIDE_URL, {
+    uid: e.uid, start: scope === 'this' ? e.start : '', action: f.dataset.action, scope,
+    title: fd.get('title') || '', label: e.summary || '', view: fd.get('viewscope') === 'view' ? pvView() : ''
+  });
+  if (res.ok) loadPreview(); else f.querySelector('.pv-err').textContent = res.error || 'Could not save.';
+});
 document.getElementById('preview-view').addEventListener('change', loadPreview);
 {% if active_tab == 'preview' %}loadPreview();{% endif %}
 
