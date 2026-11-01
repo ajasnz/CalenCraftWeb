@@ -21,10 +21,18 @@
     <input type="search" id="cal-search" placeholder="Search calendars…" autocomplete="off">
     <kbd>/</kbd>
   </label>
+  <label class="dash-sort">
+    <span class="sr-only">Sort calendars</span>
+    <select id="cal-sort" aria-label="Sort calendars">
+      <option value="name">Sort: Name</option>
+      <option value="recent">Sort: Recently fetched</option>
+      <option value="hits">Sort: Most fetched</option>
+    </select>
+  </label>
 </div>
 <div class="cal-grid" id="cal-grid">
   {% for cal in calendars %}
-  <div class="cal-card" data-name="{{ (cal.title ~ ' ' ~ cal.slug)|lower }}">
+  <div class="cal-card" data-name="{{ (cal.title ~ ' ' ~ cal.slug)|lower }}" data-last="{{ cal.last_feed_at or '' }}" data-hits="{{ cal.feed_hits or 0 }}">
     <div class="cal-card-body">
       <div class="cal-card-title">{{ cal.title }}</div>
       <div class="cal-card-slug">{{ cal.slug }}</div>
@@ -63,6 +71,21 @@
     cards.forEach(function (c) { var m = !q || c.dataset.name.indexOf(q) !== -1; c.style.display = m ? '' : 'none'; if (m) shown++; });
     none.style.display = shown ? 'none' : 'block';
   });
+  var sortSel = document.getElementById('cal-sort'), grid = document.getElementById('cal-grid');
+  var sorters = {
+    name:   function (a, b) { return a.dataset.name.localeCompare(b.dataset.name); },
+    recent: function (a, b) { return (b.dataset.last || '').localeCompare(a.dataset.last || '') || sorters.name(a, b); },
+    hits:   function (a, b) { return (+b.dataset.hits) - (+a.dataset.hits) || sorters.name(a, b); }
+  };
+  function applySort() {
+    var by = sortSel.value;
+    Array.prototype.slice.call(cards).sort(sorters[by]).forEach(function (c) { grid.appendChild(c); });
+    try { localStorage.setItem('cc-dash-sort', by); } catch (e) {}
+  }
+  try { var saved = localStorage.getItem('cc-dash-sort'); if (saved && sorters[saved]) sortSel.value = saved; } catch (e) {}
+  sortSel.addEventListener('change', applySort);
+  applySort();
+
   document.addEventListener('keydown', function (e) {
     var tag = document.activeElement.tagName;
     if (e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') { e.preventDefault(); input.focus(); }
