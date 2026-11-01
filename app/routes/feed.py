@@ -43,6 +43,11 @@ def serve_feed(user_slug, calendar_slug, view_slug):
         if expansion_end is None:
             expansion_end = now + datetime.timedelta(days=days_ahead)
 
+    try:
+        db.record_feed_hit(cfg["id"], datetime.datetime.utcnow().isoformat(timespec="seconds"))
+    except Exception:
+        current_app.logger.exception("Failed to record feed hit")
+
     # Cache key includes date range so ranged requests don't collide
     cache_key = f"feed:{user_slug}:{calendar_slug}:{view_slug}:{start_str}:{end_str}"
     cached = feed_cache.get(cache_key)

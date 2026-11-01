@@ -7,6 +7,9 @@
   <div class="cal-hero-head">
     <h2>{{ cal.title }}</h2>
     <span class="cal-hero-slug">{{ cal.slug }}</span>
+    <span class="cal-hero-activity" title="{{ cal.feed_hits }} feed fetch{{ '' if cal.feed_hits == 1 else 'es' }} in total">
+      {% if cal.last_feed_at %}Feed last fetched {{ cal.last_feed_at|timeago }}{% else %}Feed not fetched yet{% endif %}
+    </span>
   </div>
   <div class="cal-hero-links">
     {# Feed URL chip #}

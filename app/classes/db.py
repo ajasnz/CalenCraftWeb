@@ -233,6 +233,9 @@ class CalendarDB:
     def create_calendar(self, user_id, slug, title):
         return self._execute(self._named("calendar_insert"), (user_id, slug, title))
 
+    def record_feed_hit(self, calendar_id, when_iso):
+        self._execute(self._named("calendar_record_feed_hit"), (when_iso, calendar_id))
+
     def delete_calendar(self, calendar_id):
         self._execute(self._named("calendar_delete"), (calendar_id,))
 

@@ -750,6 +750,8 @@ code {
   margin-left: .35rem;
 }
 
+.cal-card-activity { font-size: .74rem; color: var(--muted); margin-top: .5rem; }
+.cal-hero-activity { font-size: .78rem; color: var(--muted); margin-left: .6rem; }
 /* ── Dark theme ── */
 :root[data-theme="dark"] {
   --bg:#0b1419; --surface:#121d24; --surface-2:#182630; --border:#25353f;
