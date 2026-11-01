@@ -65,6 +65,13 @@
 
 {# ── SOURCES ── #}
 <section class="tab-panel {% if active_tab != 'sources' %}hidden{% endif %}" id="tab-sources">
+  {% set failing = sources|selectattr('enabled')|selectattr('last_fetch_ok', 'equalto', 0)|list %}
+  {% if failing %}
+  <div class="source-alert" role="alert">
+    <strong>{{ failing|length }} source{{ '' if failing|length == 1 else 's' }} failing.</strong>
+    Subscribers still get events from your working sources. Fix or disable the failing one{{ '' if failing|length == 1 else 's' }} below, then use <em>Refresh now</em>.
+  </div>
+  {% endif %}
   <div class="section-header">
     <h3>Sources</h3>
     <div style="display:flex;gap:.5rem;align-items:center">
@@ -89,9 +96,12 @@
       <td>
         {% if s.last_fetch_at %}
           {% if s.last_fetch_ok %}
-            <span class="fetch-ok" title="Last fetched: {{ s.last_fetch_at }} UTC">✓ OK</span>
+            <span class="fetch-ok" title="Last fetched {{ s.last_fetch_at }} UTC">✓ OK</span>
+            <div class="fetch-when">{{ s.last_fetch_at|timeago }}</div>
           {% else %}
-            <span class="fetch-err" title="{{ s.last_fetch_error or 'Unknown error' }} ({{ s.last_fetch_at }} UTC)">✕ Error</span>
+            <span class="fetch-err" title="{{ s.last_fetch_at }} UTC">✕ Failed</span>
+            <div class="fetch-when">{{ s.last_fetch_at|timeago }}</div>
+            <div class="fetch-msg">{{ s.last_fetch_error or 'Unknown error' }}</div>
           {% endif %}
         {% else %}
           <span style="color:var(--muted);font-size:.8rem">—</span>
@@ -515,7 +525,10 @@
 .src-disabled td:first-child { opacity: .5; }
 .src-disabled code { opacity: .5; }
 .fetch-ok  { font-size: .78rem; font-weight: 600; color: var(--success); }
-.fetch-err { font-size: .78rem; font-weight: 600; color: var(--danger); cursor: help; }
+.fetch-err { font-size: .78rem; font-weight: 600; color: var(--danger); }
+.fetch-when { font-size: .72rem; color: var(--muted); margin-top: .1rem; }
+.fetch-msg { font-size: .74rem; color: var(--danger); margin-top: .15rem; max-width: 22rem; overflow-wrap: anywhere; }
+.source-alert { margin-bottom: .9rem; padding: .7rem .95rem; font-size: .85rem; background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); border-radius: var(--radius-sm); }
 
 .badge-not {
   display: inline-flex; align-items: center;

@@ -6,6 +6,25 @@ from icalendar import Calendar, Event
 log = logging.getLogger(__name__)
 
 
+def summarize_fetch_error(exc):
+    """Turn a fetch/parse exception into a short message a person can act on."""
+    if isinstance(exc, requests.exceptions.Timeout):
+        return "Timed out waiting for the server (15 s)."
+    if isinstance(exc, requests.exceptions.SSLError):
+        return "Secure connection failed (SSL/TLS certificate problem)."
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return "Couldn't connect to the server (DNS or network error)."
+    if isinstance(exc, requests.exceptions.HTTPError):
+        code = getattr(exc.response, "status_code", None)
+        hints = {401: "it needs a login", 403: "access denied", 404: "not found, check the URL",
+                 410: "this calendar no longer exists", 429: "rate limited, try later"}
+        hint = f" ({hints[code]})" if code in hints else ""
+        return f"The server returned HTTP {code}{hint}." if code else "The server returned an HTTP error."
+    if isinstance(exc, ValueError):
+        return "The response isn't a valid iCalendar (.ics) file."
+    return f"{type(exc).__name__}: {exc}"[:300]
+
+
 class CalendarBuilder:
     def __init__(self):
         """
@@ -49,9 +68,11 @@ class CalendarBuilder:
         for id, url in sources_to_build:
             fetch_at = datetime.datetime.utcnow().isoformat()
             try:
-                this_source_raw_ical = requests.get(
+                response = requests.get(
                     url, timeout=15, headers={"User-Agent": "CalenCraft/1.0"}
-                ).text
+                )
+                response.raise_for_status()
+                this_source_raw_ical = response.text
                 this_source_events = Calendar.from_ical(this_source_raw_ical)
                 events_by_source.append((id, this_source_events))
                 if self.db and hasattr(self.db, "update_source_fetch_status"):
@@ -59,7 +80,7 @@ class CalendarBuilder:
             except Exception as e:
                 log.warning("Error fetching source %s at %s: %s", id, url, e)
                 if self.db and hasattr(self.db, "update_source_fetch_status"):
-                    self.db.update_source_fetch_status(id, fetch_at, 0, str(e)[:500])
+                    self.db.update_source_fetch_status(id, fetch_at, 0, summarize_fetch_error(e))
                 continue
         return events_by_source
 
