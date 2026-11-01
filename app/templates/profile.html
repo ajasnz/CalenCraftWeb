@@ -39,6 +39,10 @@
   </form>
   {% elif setup_secret %}
   <p class="hint" style="margin-bottom:.6rem">Add this key to your authenticator app (Bitwarden, Google Authenticator, 1Password…), then enter the 6-digit code it shows.</p>
+  {% if setup_qr %}
+  <div class="totp-qr">{{ setup_qr|safe }}</div>
+  <p class="hint" style="margin:.5rem 0">Scan the code with your authenticator app, or enter the key manually:</p>
+  {% endif %}
   <p><code class="totp-secret">{{ setup_secret }}</code></p>
   <p style="margin:.5rem 0 1rem"><a href="{{ setup_uri }}">Open in authenticator app</a></p>
   <form method="post">

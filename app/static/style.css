@@ -842,3 +842,6 @@ main:focus { outline: none; }
 
 .totp-secret { display: inline-block; padding: .5rem .75rem; font-size: 1rem; letter-spacing: .08em; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; word-break: break-all; }
 .recovery-codes { margin: .6rem 0 1rem; padding: .75rem 1rem; font: 600 .95rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; }
+
+.totp-qr { display: inline-block; padding: .5rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); line-height: 0; }
+.totp-qr svg { width: 200px; height: 200px; display: block; }

@@ -55,7 +55,7 @@ def verify(secret, code, last_step=0, now=None, window=1):
 
 def provisioning_uri(secret, account):
     label = quote(f"{ISSUER}:{account}")
-    return f"otpauth://totp/{label}?secret={secret}&issuer={quote(ISSUER)}&algorithm=SHA1&digits={DIGITS}&period={PERIOD}"
+    return f"otpauth://totp/{label}?secret={secret}&issuer={quote(ISSUER)}"
 
 
 def format_secret(secret):
@@ -102,3 +102,18 @@ def recovery_codes_remaining(stored_json):
         return len(json.loads(stored_json or "[]"))
     except ValueError:
         return 0
+
+
+def provisioning_qr_svg(uri):
+    """Inline SVG QR code for an otpauth:// URI (dark modules on a white quiet zone).
+
+    `segno` is imported lazily so a missing optional install only disables the QR image;
+    the key and link still work.
+    """
+    try:
+        import segno
+    except ImportError:
+        return None
+    qr = segno.make(uri, error="m", micro=False)
+    return qr.svg_inline(scale=5, border=4, dark="#000000", light="#ffffff", omitsize=True,
+                         title="QR code for your authenticator app", svgclass="totp-qr-svg")
