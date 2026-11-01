@@ -312,6 +312,24 @@ def calendar_detail(calendar_slug):
     )
 
 
+@ui_bp.route("/calendars/<calendar_slug>/duplicate", methods=["POST"])
+@login_required
+def calendar_duplicate(calendar_slug):
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    existing = {c["slug"] for c in db.get_calendars(session["user_id"])}
+    base_title = f"{cal['title']} (copy)"
+    title, n = base_title, 1
+    while slugify(title) in existing:
+        n += 1
+        title = f"{base_title} {n}"
+    new_id = db.duplicate_calendar(cal["id"], slugify(title), title)
+    flash(f"Duplicated as “{title}”. Source fetch status starts fresh.", "success")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
+
+
 @ui_bp.route("/calendars/<calendar_slug>/delete", methods=["POST"])
 @login_required
 def calendar_delete(calendar_slug):

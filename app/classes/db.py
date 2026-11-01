@@ -236,6 +236,52 @@ class CalendarDB:
     def delete_calendar(self, calendar_id):
         self._execute(self._named("calendar_delete"), (calendar_id,))
 
+    def duplicate_calendar(self, calendar_id, new_slug, new_title):
+        """Copy a calendar with its settings, sources, views, filters and rules.
+
+        Sources are copied (not shared) so edits to the copy never affect the original.
+        Returns the new calendar id.
+        """
+        def copy_row(table, row, skip, overrides):
+            cols = [c for c in row if c not in skip and c not in overrides]
+            names = cols + list(overrides)
+            vals = [row[c] for c in cols] + list(overrides.values())
+            sql = "INSERT INTO {} ({}) VALUES ({})".format(
+                table, ", ".join(names), ", ".join("?" * len(names)))
+            return self._execute(sql, vals, commit=False)
+
+        try:
+            src = self._fetchone("SELECT * FROM calendars WHERE id = ?", (calendar_id,))
+            new_id = copy_row("calendars", src, {"id"}, {"slug": new_slug, "title": new_title})
+
+            source_map = {}
+            for s in self._fetchall(
+                    "SELECT s.* FROM sources s JOIN calendar_sources cs ON cs.source_id = s.id "
+                    "WHERE cs.calendar_id = ?", (calendar_id,)):
+                source_map[s["id"]] = copy_row(
+                    "sources", s,
+                    {"id", "last_fetch_at", "last_fetch_ok", "last_fetch_error"}, {})
+                self._execute("INSERT INTO calendar_sources (calendar_id, source_id) VALUES (?, ?)",
+                              (new_id, source_map[s["id"]]), commit=False)
+
+            view_map = {}
+            for v in self._fetchall("SELECT * FROM views WHERE calendar_id = ?", (calendar_id,)):
+                view_map[v["id"]] = copy_row("views", v, {"id"}, {"calendar_id": new_id})
+
+            for table in ("rules", "filters"):
+                for r in self._fetchall(
+                        "SELECT * FROM {} WHERE calendar_id = ?".format(table), (calendar_id,)):
+                    copy_row(table, r, {"id"}, {
+                        "calendar_id": new_id,
+                        "view_id": view_map.get(r["view_id"]),
+                        "source_id": source_map.get(r["source_id"]),
+                    })
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return new_id
+
     # ------------------------------------------------------------------
     # View management
     # ------------------------------------------------------------------
