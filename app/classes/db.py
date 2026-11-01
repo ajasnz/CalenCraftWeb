@@ -249,8 +249,50 @@ class CalendarDB:
         self._execute(self._named("calendar_record_feed_hit"), (when_iso, calendar_id))
 
     def delete_calendar(self, calendar_id):
-        self._execute(self._named("feed_tokens_delete_for_calendar"), (calendar_id,), commit=False)
-        self._execute(self._named("calendar_delete"), (calendar_id,))
+        """Delete a calendar and everything that belongs to it, all-or-nothing.
+
+        Foreign keys are enforced, so children must go first (same fix as the hotfix on main).
+        Sources left linked to no calendar at all are removed too.
+        """
+        try:
+            source_ids = [r["source_id"] for r in self._fetchall(
+                "SELECT source_id FROM calendar_sources WHERE calendar_id = ?", (calendar_id,))]
+            self._execute(self._named("feed_tokens_delete_for_calendar"), (calendar_id,), commit=False)
+            for table in ("rules", "filters", "views", "calendar_sources"):   # fixed names, never user input
+                self._execute("DELETE FROM %s WHERE calendar_id = ?" % table, (calendar_id,), commit=False)
+            for sid in source_ids:
+                self._execute(
+                    "DELETE FROM sources WHERE id = ? AND NOT EXISTS "
+                    "(SELECT 1 FROM calendar_sources WHERE source_id = ?)", (sid, sid), commit=False)
+            self._execute(self._named("calendar_delete"), (calendar_id,), commit=False)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+
+    # ------------------------------------------------------------------
+    # Audit log
+    # ------------------------------------------------------------------
+
+    def add_audit(self, user_id, username, action, target, detail, ip, keep):
+        import datetime
+        self._execute(self._named("audit_insert"), (
+            datetime.datetime.utcnow().isoformat(timespec="seconds"),
+            user_id, username, action, target, detail, ip), commit=False)
+        self._execute(self._named("audit_prune"), (keep,))     # cheap: PK range delete
+
+    def list_audit(self, user_id=None, q="", limit=51, offset=0):
+        sql, params = "SELECT * FROM audit_log WHERE 1=1", []
+        if user_id is not None:
+            sql += " AND user_id = ?"
+            params.append(user_id)
+        if q:
+            like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            sql += " AND (action LIKE ? ESCAPE '\\' OR target LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\')"
+            params += [like] * 4
+        sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+        params += [limit, offset]
+        return self._fetchall(sql, params)
 
     # ------------------------------------------------------------------
     # Feed access tokens (only a SHA-256 of each token is ever stored)

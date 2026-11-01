@@ -189,4 +189,24 @@ migrations = {
             CREATE INDEX IF NOT EXISTS idx_feed_tokens_calendar ON feed_tokens(calendar_id);
         """,
     },
+    7: {
+        "id": 7,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Audit log",
+        "description": "Append-only activity trail (logins, security changes, config changes). Usernames are denormalised so history survives user deletion.",
+        "sql": """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                user_id INTEGER,
+                username TEXT,
+                action TEXT NOT NULL,
+                target TEXT,
+                detail TEXT,
+                ip TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id, id);
+        """,
+    },
 }

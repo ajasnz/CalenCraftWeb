@@ -55,6 +55,11 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "audit_insert": """
+        INSERT INTO audit_log (ts, user_id, username, action, target, detail, ip)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+    "audit_prune": "DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - ?",
     "feed_tokens_delete_for_calendar": "DELETE FROM feed_tokens WHERE calendar_id = ?",
     "feed_token_insert": """
         INSERT INTO feed_tokens (calendar_id, view_slug, label, token_hash, token_prefix, created_at)

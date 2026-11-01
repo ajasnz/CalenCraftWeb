@@ -40,6 +40,14 @@
   </div>
 
   <div class="sidebar-section">
+    <a class="sidebar-item {% if request.endpoint == 'ui.activity' %}active{% endif %}"
+       href="{{ url_for('ui.activity') }}">
+      <span class="sidebar-icon">{{ icons.icon('list') }}</span>
+      <span class="sidebar-text">Activity</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section">
     <div class="sidebar-label">Calendars</div>
     {% for cal in nav_calendars %}
     <a class="sidebar-item {% if request.view_args and request.view_args.get('calendar_slug') == cal.slug %}active{% endif %}"
