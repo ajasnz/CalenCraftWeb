@@ -9,27 +9,27 @@
   {# Sanitise accent colour — only allow #rrggbb to prevent CSS injection #}
   {% set _raw_color = cfg.viewer_color or '#00a9ff' %}
   {% set _accent = _raw_color if _raw_color.startswith('#') and _raw_color|length == 7 else '#00a9ff' %}
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --accent:      {{ _accent }};
       --accent-soft: color-mix(in srgb, {{ _accent }} 12%, white);
-      --bg:      #eef3f6;
+      --bg:      #f2f5f9;
       --surface: #ffffff;
-      --surface-2:#f6f9fb;
-      --border:  #e2e8ec;
-      --border-2:#d3dce1;
-      --text:    #12181c;
-      --muted:   #6b7680;
+      --surface-2:#f7f9fc;
+      --border:  #dfe6ee;
+      --border-2:#cfdae5;
+      --text:    #0c2340;
+      --muted:   #51667b;
       --radius-sm: 8px;
       --radius:    12px;
       --radius-lg: 16px;
-      --shadow-sm: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
-      --shadow-md: 0 8px 24px -8px rgba(15,23,42,.14);
+      --shadow-sm: 0 1px 3px rgba(12,35,64,.06), 0 1px 2px rgba(12,35,64,.04);
+      --shadow-md: 0 8px 24px -8px rgba(12,35,64,.14);
     }
     html {
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
+      font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
     }
     body { background: var(--bg); color: var(--text); line-height: 1.5; font-size: 14px; }
     a { color: var(--accent); text-decoration: none; }
@@ -107,13 +107,13 @@
     /* ── Dark mode (follows the visitor's OS setting) ─────────────────── */
     @media (prefers-color-scheme: dark) {
       :root {
-        --accent-soft: color-mix(in srgb, {{ _accent }} 22%, #0f171c);
-        --bg: #0b1419; --surface: #121d24; --surface-2: #182630;
-        --border: #25353f; --border-2: #33454f; --text: #e6eef2; --muted: #9bb0bb;
+        --accent-soft: color-mix(in srgb, {{ _accent }} 24%, #0c2340);
+        --bg: #0c2340; --surface: #133556; --surface-2: #0f2b49;
+        --border: #234a6d; --border-2: #2f5b82; --text: #f2f5f9; --muted: #a9bdd0;
         --shadow-sm: 0 1px 3px rgba(0,0,0,.4); --shadow-md: 0 8px 24px -8px rgba(0,0,0,.55);
         color-scheme: dark;
       }
-      #cal-loading { background: rgba(18,29,36,.85); }
+      #cal-loading { background: rgba(19,53,86,.85); }
       .toastui-calendar-weekday-event-dot ~ .toastui-calendar-weekday-event-title, .toastui-calendar-weekday-event-dot + .toastui-calendar-weekday-event-title { color: var(--text) !important; }
       .toastui-calendar-daygrid-cell { border-left-color: var(--border) !important; border-top-color: var(--border) !important; }
       .toastui-calendar-popup-container, .toastui-calendar-detail-container,
@@ -262,25 +262,25 @@ const calendar = new tui.Calendar('#calendar', {
 if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) {
   calendar.setTheme({
     common: {
-      backgroundColor: '#121d24', border: '1px solid #25353f',
-      gridSelection: { backgroundColor: 'rgba(255,255,255,.06)', border: '1px solid #33454f' },
-      dayName: { color: '#9bb0bb' }, holiday: { color: '#f26868' }, saturday: { color: '#9bb0bb' }, today: { color: '#e6eef2' },
+      backgroundColor: '#133556', border: '1px solid #234a6d',
+      gridSelection: { backgroundColor: 'rgba(255,255,255,.06)', border: '1px solid #2f5b82' },
+      dayName: { color: '#a9bdd0' }, holiday: { color: '#f26868' }, saturday: { color: '#a9bdd0' }, today: { color: '#f2f5f9' },
     },
     month: {
-      dayName: { borderLeft: '1px solid #25353f', backgroundColor: '#182630' },
-      dayExceptThisMonth: { color: '#5d727d' },
+      dayName: { borderLeft: '1px solid #234a6d', backgroundColor: '#0f2b49' },
+      dayExceptThisMonth: { color: '#7a94ab' },
       holidayExceptThisMonth: { color: 'rgba(242,104,104,.4)' },
-      moreView: { backgroundColor: '#121d24', border: '1px solid #25353f' },
+      moreView: { backgroundColor: '#133556', border: '1px solid #234a6d' },
     },
     week: {
-      dayName: { borderTop: '1px solid #25353f', borderBottom: '1px solid #25353f', borderLeft: '1px solid #25353f', backgroundColor: '#182630' },
-      dayGridLeft: { borderRight: '1px solid #25353f', backgroundColor: '#182630', color: '#9bb0bb' },
-      timeGridLeft: { borderRight: '1px solid #25353f', backgroundColor: '#182630', color: '#9bb0bb' },
-      timeGridHalfHourLine: { borderBottom: '1px dotted #25353f' },
-      timeGridHourLine: { borderBottom: '1px solid #25353f' },
-      dayGrid: { borderRight: '1px solid #25353f', backgroundColor: '#121d24' },
-      today: { color: '#e6eef2', backgroundColor: 'rgba(255,255,255,.04)' },
-      pastDay: { color: '#6c8491' },
+      dayName: { borderTop: '1px solid #234a6d', borderBottom: '1px solid #234a6d', borderLeft: '1px solid #234a6d', backgroundColor: '#0f2b49' },
+      dayGridLeft: { borderRight: '1px solid #234a6d', backgroundColor: '#0f2b49', color: '#a9bdd0' },
+      timeGridLeft: { borderRight: '1px solid #234a6d', backgroundColor: '#0f2b49', color: '#a9bdd0' },
+      timeGridHalfHourLine: { borderBottom: '1px dotted #234a6d' },
+      timeGridHourLine: { borderBottom: '1px solid #234a6d' },
+      dayGrid: { borderRight: '1px solid #234a6d', backgroundColor: '#133556' },
+      today: { color: '#f2f5f9', backgroundColor: 'rgba(255,255,255,.04)' },
+      pastDay: { color: '#7a94ab' },
     },
   });
 }

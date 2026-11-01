@@ -4,7 +4,7 @@ from flask import Blueprint, Response, current_app, render_template, url_for
 
 pwa_bp = Blueprint("pwa", __name__)
 
-THEME_COLOR = "#0891b2"
+THEME_COLOR = "#0c2340"
 
 
 def _static_version():
@@ -28,7 +28,7 @@ def manifest():
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
-        "background_color": "#eef3f6",
+        "background_color": "#f2f5f9",
         "theme_color": THEME_COLOR,
         "icons": [
             {"src": url_for("static", filename="icons/icon-192.png"), "sizes": "192x192", "type": "image/png", "purpose": "any"},

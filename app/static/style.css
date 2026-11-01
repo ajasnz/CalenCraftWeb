@@ -3,19 +3,19 @@
 
 :root {
   /* Palette — blue/teal */
-  --bg:           #eef3f6;
+  --bg:           #f2f5f9;
   --surface:      #ffffff;
-  --surface-2:    #f6f9fb;
-  --border:       #e0e7ec;
-  --border-focus: #0891b2;
-  --text:         #0f1a20;
-  --muted:        #5b6c76;
-  --muted-light:  #93a5ad;
-  --primary:      #0891b2;
-  --primary-dark: #0e7490;
-  --primary-2:    #2563eb;
-  --primary-bg:   #e3f4f8;
-  --primary-border: #b9e4ee;
+  --surface-2:    #f7f9fc;
+  --border:       #dfe6ee;
+  --border-focus: #1f80ab;
+  --text:         #0c2340;
+  --muted:        #51667b;
+  --muted-light:  #8497a9;
+  --primary:      #17698f;
+  --primary-dark: #133556;
+  --primary-2:    #1f80ab;
+  --primary-bg:   #e8f2f8;
+  --primary-border: #cfe6f1;
   --danger:       #dc2626;
   --danger-dark:  #b91c1c;
   --danger-bg:    #fdecec;
@@ -23,12 +23,13 @@
   --success-bg:   #e7f8f1;
   --warning-bg:   #fdf1e3;
   --warning:      #c8760a;
-  --gradient:     linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  --btn-bg: #0c2340;
+  --gradient: var(--btn-bg);
   --success-border: #bbf7d0;
   --danger-border:  #fecaca;
   --danger-text:    #991b1b;
-  --ics-bg: #dbeafe; --ics-fg: #1d4ed8; --ics-border: #bfdbfe;
-  --row-hover: #f4fafc;
+  --ics-bg: #e8f2f8; --ics-fg: #133556; --ics-border: #cfe6f1;
+  --row-hover: #f4f8fb;
   color-scheme: light;
 
   /* Layout */
@@ -41,13 +42,13 @@
   --radius-lg: 14px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
-  --shadow:    0 1px 3px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.05);
-  --shadow-md: 0 4px 16px rgba(15,23,42,.10), 0 1px 4px rgba(15,23,42,.06);
+  --shadow-sm: 0 1px 3px rgba(12,35,64,.06), 0 1px 2px rgba(12,35,64,.04);
+  --shadow:    0 1px 3px rgba(12,35,64,.06), 0 4px 12px rgba(12,35,64,.05);
+  --shadow-md: 0 4px 16px rgba(12,35,64,.10), 0 1px 4px rgba(12,35,64,.06);
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 14.5px;
   background: var(--bg);
   color: var(--text);
@@ -72,9 +73,7 @@ a:hover { text-decoration: underline; }
 }
 .topbar-brand {
   font-weight: 800; font-size: .95rem; letter-spacing: -.02em;
-  background: var(--gradient);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 .hamburger {
   background: none; border: none; font-size: 1.1rem;
@@ -97,7 +96,7 @@ a:hover { text-decoration: underline; }
 }
 .sidebar.open { transform: translateX(0); }
 .sidebar-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(15,23,42,.35);
+  display: none; position: fixed; inset: 0; background: rgba(12,35,64,.35);
   z-index: 299; backdrop-filter: blur(2px);
 }
 .sidebar-overlay.open { display: block; }
@@ -116,9 +115,7 @@ a:hover { text-decoration: underline; }
 }
 .sidebar-header .brand {
   font-weight: 800; font-size: .95rem; letter-spacing: -.02em;
-  background: var(--gradient);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .sidebar-section { padding: .375rem .625rem; }
@@ -314,11 +311,11 @@ main {
   cursor: pointer; text-decoration: none;
   transition: box-shadow .15s, transform .1s, filter .15s;
   white-space: nowrap; line-height: 1.4;
-  box-shadow: 0 1px 2px rgba(8,145,178,.25);
+  box-shadow: 0 1px 2px rgba(12,35,64,.25);
 }
 .btn:hover {
   filter: brightness(1.06); color: #fff; text-decoration: none;
-  box-shadow: 0 4px 14px rgba(8,145,178,.35);
+  box-shadow: 0 4px 14px rgba(12,35,64,.30);
 }
 .btn:active { transform: scale(.98); }
 .btn-sm { padding: .3rem .65rem; font-size: .78rem; }
@@ -429,10 +426,7 @@ main {
 
 /* ── Landing page ── */
 body:has(.landing-hero) {
-  background:
-    radial-gradient(circle at 15% 20%, rgba(8,145,178,.10), transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(37,99,235,.10), transparent 45%),
-    var(--bg);
+  background: var(--bg);
   min-height: 100vh;
 }
 .landing-hero {
@@ -470,10 +464,7 @@ body:has(.landing-hero) {
 
 /* ── Auth card ── */
 body:has(.auth-card) {
-  background:
-    radial-gradient(circle at 15% 20%, rgba(8,145,178,.10), transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(37,99,235,.10), transparent 45%),
-    var(--bg);
+  background: var(--bg);
   min-height: 100vh;
 }
 .auth-card {
@@ -517,7 +508,7 @@ label {
 }
 label:first-child { margin-top: 0; }
 
-input[type=text], input[type=url], input[type=email],
+input[type=text], input[type=url], input[type=email], input[type=search],
 input[type=password], input[type=number], select, textarea {
   width: 100%;
   padding: .5rem .75rem;
@@ -532,7 +523,7 @@ input[type=password], input[type=number], select, textarea {
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(8,145,178,.16);
+  box-shadow: 0 0 0 3px rgba(31,128,171,.20);
 }
 input[disabled] { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
 textarea { resize: vertical; }
@@ -752,29 +743,29 @@ code {
 
 .cal-card-activity { font-size: .74rem; color: var(--muted); margin-top: .5rem; }
 .cal-hero-activity { font-size: .78rem; color: var(--muted); margin-left: .6rem; }
-/* ── Dark theme ── */
+/* ── Dark theme (brand navy ground) ── */
 :root[data-theme="dark"] {
-  --bg:#0b1419; --surface:#121d24; --surface-2:#182630; --border:#25353f;
-  --text:#e6eef2; --muted:#9bb0bb; --muted-light:#6c8491;
-  --primary:#22b8d6; --primary-dark:#4fcbe3; --primary-2:#4f8cff;
-  --primary-bg:#0f2f3a; --primary-border:#1d4b5a;
-  --danger:#f26868; --danger-dark:#e04a4a; --danger-bg:#2e1517;
-  --success:#34d399; --success-bg:#0f2a21; --warning-bg:#33250f; --warning:#f0a33a;
-  --success-border:#1b4a39; --danger-border:#5a2427; --danger-text:#f4a3a3;
-  --ics-bg:#14284d; --ics-fg:#8db4ff; --ics-border:#233f73; --row-hover:#16252e;
+  --bg:#0c2340; --surface:#133556; --surface-2:#0f2b49; --border:#234a6d;
+  --border-focus:#7cc4e8; --text:#f2f5f9; --muted:#a9bdd0; --muted-light:#7a94ab;
+  --primary:#7cc4e8; --primary-dark:#a9dcf3; --primary-2:#5db4dd;
+  --primary-bg:#153d5f; --primary-border:#2f5b82; --btn-bg:#17698f;
+  --danger:#f26868; --danger-dark:#e04a4a; --danger-bg:#3a1c26;
+  --success:#34d399; --success-bg:#0f3a35; --warning-bg:#3a3018; --warning:#f0a33a;
+  --success-border:#1f5a4c; --danger-border:#6a2c3a; --danger-text:#f4a3a3;
+  --ics-bg:#153d5f; --ics-fg:#a9dcf3; --ics-border:#2f5b82; --row-hover:#17395c;
   --shadow-sm:0 1px 3px rgba(0,0,0,.4); --shadow:0 4px 12px rgba(0,0,0,.35); --shadow-md:0 6px 20px rgba(0,0,0,.45);
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:#0b1419; --surface:#121d24; --surface-2:#182630; --border:#25353f;
-    --text:#e6eef2; --muted:#9bb0bb; --muted-light:#6c8491;
-    --primary:#22b8d6; --primary-dark:#4fcbe3; --primary-2:#4f8cff;
-    --primary-bg:#0f2f3a; --primary-border:#1d4b5a;
-    --danger:#f26868; --danger-dark:#e04a4a; --danger-bg:#2e1517;
-    --success:#34d399; --success-bg:#0f2a21; --warning-bg:#33250f; --warning:#f0a33a;
-    --success-border:#1b4a39; --danger-border:#5a2427; --danger-text:#f4a3a3;
-    --ics-bg:#14284d; --ics-fg:#8db4ff; --ics-border:#233f73; --row-hover:#16252e;
+    --bg:#0c2340; --surface:#133556; --surface-2:#0f2b49; --border:#234a6d;
+    --border-focus:#7cc4e8; --text:#f2f5f9; --muted:#a9bdd0; --muted-light:#7a94ab;
+    --primary:#7cc4e8; --primary-dark:#a9dcf3; --primary-2:#5db4dd;
+    --primary-bg:#153d5f; --primary-border:#2f5b82; --btn-bg:#17698f;
+    --danger:#f26868; --danger-dark:#e04a4a; --danger-bg:#3a1c26;
+    --success:#34d399; --success-bg:#0f3a35; --warning-bg:#3a3018; --warning:#f0a33a;
+    --success-border:#1f5a4c; --danger-border:#6a2c3a; --danger-text:#f4a3a3;
+    --ics-bg:#153d5f; --ics-fg:#a9dcf3; --ics-border:#2f5b82; --row-hover:#17395c;
     --shadow-sm:0 1px 3px rgba(0,0,0,.4); --shadow:0 4px 12px rgba(0,0,0,.35); --shadow-md:0 6px 20px rgba(0,0,0,.45);
     color-scheme: dark;
   }
@@ -839,3 +830,8 @@ main:focus { outline: none; }
 
 .dash-sort select { width: auto; padding: .5rem 2rem .5rem .75rem; font-size: .85rem; }
 @media (max-width: 600px) { .dash-tools { flex-wrap: wrap; } }
+
+/* ── Brand type: Plus Jakarta Sans, 800 headings / 700 labels / 500 body ── */
+body { font-weight: 500; }
+h1, h2, h3 { font-weight: 800; letter-spacing: -.01em; }
+.btn, .tab.active, .form-card-title, .page-header h2 { font-weight: 700; }
