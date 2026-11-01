@@ -20,6 +20,13 @@ CalenCraft pulls together multiple `.ics` feeds, applies your filters and transf
 - **Multi-user** — each user manages their own calendars; first user is automatically admin
 - **First-run setup** — web-based admin account creation on a fresh install
 - **Feed caching** — in-memory TTL cache reduces upstream fetches under load
+- **Dark mode** — follows your OS setting with a manual toggle in the app; the public viewer and embed widget follow the visitor's OS setting
+- **Duplicate calendar** — copy a calendar with its sources, views, filters, rules and sharing settings (Advanced tab)
+- **Feed activity** — see when each calendar's feed was last fetched and how many times it has been fetched
+- **Source health** — dashboard flags calendars whose sources failed their last fetch
+- **Preview tab** — see the next 30 days of events exactly as a view's feed will serve them, after all filters and rules
+- **Installable (PWA)** — install CalenCraft from your browser; static assets are cached and an offline page is shown without a connection (feeds and the public viewer are never cached)
+- **Quick actions** — dashboard search (`/`), one-click feed URL copy, `n` for a new calendar
 - **Security-hardened** — security headers, CSRF mitigations, source URL validation, rate-limited login
 
 ---
@@ -88,6 +95,10 @@ mkdir -p data
 python3 run.py
 # Open http://localhost:5001
 ```
+
+### Database migrations
+
+Schema changes are **append-only, numbered migrations** in `app/functions/db/db_migrations.py`. They run automatically at startup against `DB_PATH` and are recorded in `settings.db_version`, so deploying a new version upgrades a live database in place. Never edit or renumber an existing migration; add a new one (keep changes additive, e.g. `ADD COLUMN ... DEFAULT ...`) and include a test that upgrades an older database (see `tests/test_feed_activity.py`).
 
 ### Running tests
 
