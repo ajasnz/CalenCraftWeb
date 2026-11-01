@@ -237,7 +237,26 @@ class CalendarDB:
         self._execute(self._named("calendar_record_feed_hit"), (when_iso, calendar_id))
 
     def delete_calendar(self, calendar_id):
-        self._execute(self._named("calendar_delete"), (calendar_id,))
+        """Delete a calendar and everything that belongs to it, all-or-nothing.
+
+        Foreign keys are enforced, so children must go first; deleting just the calendar row
+        failed for any calendar that had a source, view, rule or filter. Sources left linked to
+        no calendar at all are removed too, so they don't pile up as orphans.
+        """
+        try:
+            source_ids = [r["source_id"] for r in self._fetchall(
+                "SELECT source_id FROM calendar_sources WHERE calendar_id = ?", (calendar_id,))]
+            for table in ("rules", "filters", "views", "calendar_sources"):   # fixed names, never user input
+                self._execute("DELETE FROM %s WHERE calendar_id = ?" % table, (calendar_id,), commit=False)
+            for sid in source_ids:
+                self._execute(
+                    "DELETE FROM sources WHERE id = ? AND NOT EXISTS "
+                    "(SELECT 1 FROM calendar_sources WHERE source_id = ?)", (sid, sid), commit=False)
+            self._execute(self._named("calendar_delete"), (calendar_id,), commit=False)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
 
     def duplicate_calendar(self, calendar_id, new_slug, new_title):
         """Copy a calendar with its settings, sources, views, filters and rules.
