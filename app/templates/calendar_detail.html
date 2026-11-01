@@ -67,7 +67,12 @@
 <section class="tab-panel {% if active_tab != 'sources' %}hidden{% endif %}" id="tab-sources">
   <div class="section-header">
     <h3>Sources</h3>
-    <a class="btn btn-sm" href="{{ url_for('ui.source_add', calendar_slug=cal.slug) }}">+ Add Source</a>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <form method="post" action="{{ url_for('ui.calendar_refresh', calendar_slug=cal.slug) }}" style="margin:0">
+        <button class="btn btn-sm btn-ghost" title="Clear cached feeds and re-fetch all sources now">Refresh now</button>
+      </form>
+      <a class="btn btn-sm" href="{{ url_for('ui.source_add', calendar_slug=cal.slug) }}">+ Add Source</a>
+    </div>
   </div>
   {% if sources %}
   <div class="table-wrap">

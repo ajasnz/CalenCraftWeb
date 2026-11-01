@@ -37,6 +37,15 @@ def invalidate(key):
         _cache.pop(key, None)
 
 
+def invalidate_prefix(prefix):
+    """Drop every entry whose key starts with `prefix`; returns how many were removed."""
+    with _lock:
+        doomed = [k for k in _cache if k.startswith(prefix)]
+        for k in doomed:
+            del _cache[k]
+        return len(doomed)
+
+
 def clear():
     with _lock:
         _cache.clear()
