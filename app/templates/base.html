@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}CalenCraft{% endblock %}</title>
+  <script>try{var t=localStorage.getItem('cc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -71,6 +72,8 @@
 <header class="topbar">
   <button class="hamburger" onclick="openSidebar()" aria-label="Menu">{{ icons.icon('menu') }}</button>
   <a class="topbar-brand" href="{{ url_for('ui.dashboard') }}">CalenCraft</a>
+  <span class="topbar-spacer"></span>
+  <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">{{ icons.icon('moon', 'icon i-moon') }}{{ icons.icon('sun', 'icon i-sun') }}</button>
 </header>
 {% endif %}
 
@@ -85,10 +88,32 @@
   </main>
 </div>
 
+<div class="toast-host" id="toast-host" aria-live="polite"></div>
+<script>
+function toast(msg) {
+  var h = document.getElementById('toast-host'), t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg; h.appendChild(t);
+  setTimeout(function(){ t.classList.add('out'); setTimeout(function(){ t.remove(); }, 300); }, 1800);
+}
+function toggleTheme() {
+  var r = document.documentElement, cur = r.getAttribute('data-theme');
+  if (!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  var next = cur === 'dark' ? 'light' : 'dark';
+  r.setAttribute('data-theme', next);
+  try { localStorage.setItem('cc-theme', next); } catch (e) {}
+}
+</script>
 {% if session.user_id %}
 <script>
 function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebar-overlay').classList.add('open'); }
 function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebar-overlay').classList.remove('open'); }
+document.addEventListener('keydown', function(e) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  var tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+  if (e.key === 'n') { e.preventDefault(); location.href = "{{ url_for('ui.calendar_new') }}"; }
+  else if (e.key === 'Escape') closeSidebar();
+});
 </script>
 {% endif %}
 </body>

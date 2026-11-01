@@ -188,7 +188,9 @@ def dashboard():
     cal_list = []
     for cal in calendars:
         d = dict(cal)
-        d["source_count"] = len(db.get_sources(cal["id"]))
+        sources = db.get_sources(cal["id"])
+        d["source_count"] = len(sources)
+        d["failing_sources"] = sum(1 for s in sources if s["enabled"] and s["last_fetch_ok"] == 0)
         d["view_count"]   = len(db.get_views(cal["id"]))
         cal_list.append(d)
     return render_template("dashboard.html", calendars=cal_list, nav_calendars=calendars)
