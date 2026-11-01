@@ -332,6 +332,55 @@ def calendar_duplicate(calendar_slug):
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
+_EXPORT_CAL_SKIP = {"id", "user_id", "state", "viewer_password", "feed_hits", "last_feed_at"}
+_EXPORT_VIEW_SKIP = {"id", "calendar_id", "state", "viewer_password"}
+
+
+def build_calendar_export(db, user_slug, cal):
+    """Portable, secret-free snapshot of a calendar's configuration.
+
+    Views/sources are referenced by slug/name rather than internal IDs so the file is
+    readable and independent of this database. Viewer passwords are never exported.
+    """
+    sources = db.get_sources(cal["id"])
+    views = db.get_views(cal["id"])
+    view_slug = {v["id"]: v["slug"] for v in views}
+    source_name = {s["id"]: s["name"] for s in sources}
+
+    def scope(row):
+        return {"view": view_slug.get(row["view_id"]), "source": source_name.get(row["source_id"])}
+
+    rules = [{**scope(r), **{k: v for k, v in r.items()
+                             if k not in ("id", "calendar_id", "view_id", "source_id", "state")}}
+             for r in db.get_rules(user_slug, cal["slug"])]
+    filters = [{**scope(f), **{k: v for k, v in f.items()
+                               if k not in ("id", "calendar_id", "view_id", "source_id", "state")}}
+               for f in db.get_filters(user_slug, cal["slug"])]
+    return {
+        "calencraft_export": 1,
+        "exported_at": datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "calendar": {k: v for k, v in cal.items() if k not in _EXPORT_CAL_SKIP},
+        "sources": [{"name": s["name"], "url": s["url"], "enabled": bool(s["enabled"])} for s in sources],
+        "views": [{k: v for k, v in vw.items() if k not in _EXPORT_VIEW_SKIP} for vw in views],
+        "filters": filters,
+        "rules": rules,
+    }
+
+
+@ui_bp.route("/calendars/<calendar_slug>/export.json")
+@login_required
+def calendar_export(calendar_slug):
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    payload = build_calendar_export(db, session["user_slug"], cal)
+    resp = current_app.response_class(json.dumps(payload, indent=2, default=str), mimetype="application/json")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{calendar_slug}-calencraft.json"'
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @ui_bp.route("/calendars/<calendar_slug>/delete", methods=["POST"])
 @login_required
 def calendar_delete(calendar_slug):

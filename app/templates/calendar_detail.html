@@ -484,6 +484,12 @@
   </form>
 
   <div class="card" style="margin-bottom:1rem;padding:1.1rem 1.35rem">
+    <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.3rem">Export configuration</h3>
+    <p class="hint" style="margin-bottom:.8rem">Download a JSON backup of this calendar's sources, views, filters, rules and settings. Viewer passwords are not included.</p>
+    <a class="btn btn-ghost" href="{{ url_for('ui.calendar_export', calendar_slug=cal.slug) }}" download>Download JSON</a>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;padding:1.1rem 1.35rem">
     <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.3rem">Duplicate Calendar</h3>
     <p class="hint" style="margin-bottom:.8rem">Make an independent copy with the same sources, views, filters, rules and sharing settings.</p>
     <form method="post" action="{{ url_for('ui.calendar_duplicate', calendar_slug=cal.slug) }}">
