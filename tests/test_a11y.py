@@ -12,6 +12,7 @@ def client(tmp_path, monkeypatch):
     return app.test_client()
 
 
-def test_pages_have_skip_link_and_main_landmark(client):
+def test_pages_have_main_landmark_and_no_skip_link(client):
     html = client.get("/login").get_data(as_text=True)
-    assert 'href="#main"' in html and 'id="main"' in html
+    assert 'id="main"' in html
+    assert "skip-link" not in html
