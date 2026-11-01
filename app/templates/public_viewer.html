@@ -114,6 +114,7 @@
         color-scheme: dark;
       }
       #cal-loading { background: rgba(18,29,36,.85); }
+      .toastui-calendar-weekday-event-dot ~ .toastui-calendar-weekday-event-title, .toastui-calendar-weekday-event-dot + .toastui-calendar-weekday-event-title { color: var(--text) !important; }
       .toastui-calendar-daygrid-cell { border-left-color: var(--border) !important; border-top-color: var(--border) !important; }
       .toastui-calendar-popup-container, .toastui-calendar-detail-container,
       .toastui-calendar-see-more-container { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
@@ -251,6 +252,9 @@ const calendar = new tui.Calendar('#calendar', {
       return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title);
     },
     allday(event) { return event.title; },
+    // Read-only viewer: hide the popup's Edit/Delete actions
+    popupEdit() { return ''; },
+    popupDelete() { return ''; },
   },
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });

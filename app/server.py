@@ -48,6 +48,7 @@ def create_app():
     from app.routes.ui import ui_bp
     from app.routes.public import public_bp
     from app.routes.setup import setup_bp
+    from app.routes.pwa import pwa_bp
 
     @app.template_filter("timeago")
     def timeago(value):
@@ -71,6 +72,7 @@ def create_app():
     app.register_blueprint(ui_bp)
     app.register_blueprint(public_bp)
     app.register_blueprint(setup_bp)
+    app.register_blueprint(pwa_bp)
 
     # ── First-run gate: redirect everything to /setup when no users exist ─
     from flask import redirect, url_for, request as flask_request
@@ -81,7 +83,7 @@ def create_app():
     def first_run_gate():
         path = flask_request.path
         # Allow setup route, health check, and static files through unconditionally
-        if path == "/setup" or path.startswith("/static") or path == "/health":
+        if path in ("/setup", "/health", "/manifest.webmanifest", "/sw.js", "/offline") or path.startswith("/static"):
             return
         # Only check if no users exist (cheap query, cached after first user is created)
         if not app.db.get_users():
