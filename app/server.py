@@ -50,6 +50,23 @@ def create_app():
     from app.routes.setup import setup_bp
     from app.routes.pwa import pwa_bp
 
+    @app.template_filter("timeago")
+    def timeago(value):
+        """Render a UTC ISO timestamp as '5 min ago'; empty string if missing/invalid."""
+        import datetime
+        try:
+            then = datetime.datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return ""
+        secs = int((datetime.datetime.utcnow() - then).total_seconds())
+        if secs < 60:
+            return "just now"
+        for unit, size in (("day", 86400), ("hour", 3600), ("min", 60)):
+            if secs >= size:
+                n = secs // size
+                return f"{n} {unit}{'s' if n != 1 and unit != 'min' else ''} ago"
+        return ""
+
     app.register_blueprint(feed_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(ui_bp)
