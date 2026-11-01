@@ -836,3 +836,6 @@ main:focus { outline: none; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
   .cal-card:hover { transform: none; }
 }
+
+.dash-sort select { width: auto; padding: .5rem 2rem .5rem .75rem; font-size: .85rem; }
+@media (max-width: 600px) { .dash-tools { flex-wrap: wrap; } }
