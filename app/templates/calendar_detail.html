@@ -470,6 +470,14 @@
     </div>
   </form>
 
+  <div class="card" style="margin-bottom:1rem;padding:1.1rem 1.35rem">
+    <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.3rem">Duplicate Calendar</h3>
+    <p class="hint" style="margin-bottom:.8rem">Make an independent copy with the same sources, views, filters, rules and sharing settings.</p>
+    <form method="post" action="{{ url_for('ui.calendar_duplicate', calendar_slug=cal.slug) }}">
+      <button class="btn btn-ghost">Duplicate</button>
+    </form>
+  </div>
+
   <div class="danger-zone">
     <h3>Delete Calendar</h3>
     <p>Permanently delete this calendar and all its sources, rules, and filters. This cannot be undone.</p>

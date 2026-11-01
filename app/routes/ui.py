@@ -188,7 +188,9 @@ def dashboard():
     cal_list = []
     for cal in calendars:
         d = dict(cal)
-        d["source_count"] = len(db.get_sources(cal["id"]))
+        sources = db.get_sources(cal["id"])
+        d["source_count"] = len(sources)
+        d["failing_sources"] = sum(1 for s in sources if s["enabled"] and s["last_fetch_ok"] == 0)
         d["view_count"]   = len(db.get_views(cal["id"]))
         cal_list.append(d)
     return render_template("dashboard.html", calendars=cal_list, nav_calendars=calendars)
@@ -310,6 +312,24 @@ def calendar_detail(calendar_slug):
         user_slug=session["user_slug"],
         **_label_maps(),
     )
+
+
+@ui_bp.route("/calendars/<calendar_slug>/duplicate", methods=["POST"])
+@login_required
+def calendar_duplicate(calendar_slug):
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    existing = {c["slug"] for c in db.get_calendars(session["user_id"])}
+    base_title = f"{cal['title']} (copy)"
+    title, n = base_title, 1
+    while slugify(title) in existing:
+        n += 1
+        title = f"{base_title} {n}"
+    new_id = db.duplicate_calendar(cal["id"], slugify(title), title)
+    flash(f"Duplicated as “{title}”. Source fetch status starts fresh.", "success")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
 @ui_bp.route("/calendars/<calendar_slug>/delete", methods=["POST"])
