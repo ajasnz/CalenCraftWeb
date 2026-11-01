@@ -24,6 +24,8 @@ CalenCraft pulls together multiple `.ics` feeds, applies your filters and transf
 - **Duplicate calendar** — copy a calendar with its sources, views, filters, rules and sharing settings (Advanced tab)
 - **Feed activity** — see when each calendar's feed was last fetched and how many times it has been fetched
 - **Source health** — dashboard flags calendars whose sources failed their last fetch
+- **Preview tab** — see the next 30 days of events exactly as a view's feed will serve them, after all filters and rules
+- **Installable (PWA)** — install CalenCraft from your browser; static assets are cached and an offline page is shown without a connection (feeds and the public viewer are never cached)
 - **Quick actions** — dashboard search (`/`), one-click feed URL copy, `n` for a new calendar
 - **Security-hardened** — security headers, CSRF mitigations, source URL validation, rate-limited login
 
