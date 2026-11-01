@@ -143,4 +143,15 @@ migrations = {
             ALTER TABLE views    ADD COLUMN viewer_hide_private INTEGER;
         """,
     },
+    4: {
+        "id": 4,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Feed activity tracking",
+        "description": "Track how many times a calendar feed was fetched and when it was last fetched.",
+        "sql": """
+            ALTER TABLE calendars ADD COLUMN feed_hits INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE calendars ADD COLUMN last_feed_at TEXT;
+        """,
+    },
 }

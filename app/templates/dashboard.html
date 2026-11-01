@@ -26,6 +26,9 @@
         {% if cal.share_ics %}<span class="cal-badge cal-badge-ics">ICS</span>{% endif %}
         {% if cal.share_viewer %}<span class="cal-badge cal-badge-viewer">Viewer</span>{% endif %}
       </div>
+      <div class="cal-card-activity">
+        {% if cal.last_feed_at %}Feed fetched {{ cal.last_feed_at|timeago }} · {{ cal.feed_hits }} total{% else %}Feed not fetched yet{% endif %}
+      </div>
     </div>
     <div class="cal-card-footer">
       <a class="btn btn-sm" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug) }}">Manage →</a>

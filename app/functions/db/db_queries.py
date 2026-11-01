@@ -41,6 +41,9 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "calendar_record_feed_hit": """
+        UPDATE calendars SET feed_hits = feed_hits + 1, last_feed_at = ? WHERE id = ?
+    """,
     "calendar_update_sharing": """
         UPDATE calendars SET
             share_ics=?, share_viewer=?, viewer_password=?,

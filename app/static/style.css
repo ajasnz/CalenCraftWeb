@@ -743,3 +743,6 @@ code {
   border-radius: 99px; font-size: .7rem; font-weight: 700;
   margin-left: .35rem;
 }
+
+.cal-card-activity { font-size: .74rem; color: var(--muted); margin-top: .5rem; }
+.cal-hero-activity { font-size: .78rem; color: var(--muted); margin-left: .6rem; }
