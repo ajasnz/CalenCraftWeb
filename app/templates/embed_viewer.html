@@ -21,6 +21,23 @@
       --muted:   #6b7680;
       --radius-sm: 8px;
     }
+
+    /* ── Dark mode (follows the visitor's OS setting) ─────────────────── */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --accent-soft: color-mix(in srgb, {{ _accent }} 22%, #0f171c);
+        --bg: #0b1419; --surface: #121d24; --surface-2: #182630;
+        --border: #25353f; --border-2: #33454f; --text: #e6eef2; --muted: #9bb0bb;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,.4); --shadow-md: 0 8px 24px -8px rgba(0,0,0,.55);
+        color-scheme: dark;
+      }
+      #cal-loading { background: rgba(18,29,36,.85); }
+      .toastui-calendar-popup-container, .toastui-calendar-detail-container,
+      .toastui-calendar-see-more-container { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
+      .toastui-calendar-popup-section-item, .toastui-calendar-popup-section { border-color: var(--border) !important; color: var(--text) !important; }
+      .toastui-calendar-detail-item, .toastui-calendar-content, .toastui-calendar-template-popupDetailTitle { color: var(--text) !important; }
+    }
+
     html, body { height: 100%; }
     html { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--surface); color: var(--text); line-height: 1.5; font-size: 13px; overflow: hidden; }
@@ -104,6 +121,32 @@ const calendar = new tui.Calendar('#calendar', {
   },
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
+
+if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) {
+  calendar.setTheme({
+    common: {
+      backgroundColor: '#121d24', border: '1px solid #25353f',
+      gridSelection: { backgroundColor: 'rgba(255,255,255,.06)', border: '1px solid #33454f' },
+      dayName: { color: '#9bb0bb' }, holiday: { color: '#f26868' }, saturday: { color: '#9bb0bb' }, today: { color: '#e6eef2' },
+    },
+    month: {
+      dayName: { borderLeft: '1px solid #25353f', backgroundColor: '#182630' },
+      dayExceptThisMonth: { color: '#5d727d' },
+      holidayExceptThisMonth: { color: 'rgba(242,104,104,.4)' },
+      moreView: { backgroundColor: '#121d24', border: '1px solid #25353f' },
+    },
+    week: {
+      dayName: { borderTop: '1px solid #25353f', borderBottom: '1px solid #25353f', borderLeft: '1px solid #25353f', backgroundColor: '#182630' },
+      dayGridLeft: { borderRight: '1px solid #25353f', backgroundColor: '#182630', color: '#9bb0bb' },
+      timeGridLeft: { borderRight: '1px solid #25353f', backgroundColor: '#182630', color: '#9bb0bb' },
+      timeGridHalfHourLine: { borderBottom: '1px dotted #25353f' },
+      timeGridHourLine: { borderBottom: '1px solid #25353f' },
+      dayGrid: { borderRight: '1px solid #25353f', backgroundColor: '#121d24' },
+      today: { color: '#e6eef2', backgroundColor: 'rgba(255,255,255,.04)' },
+      pastDay: { color: '#6c8491' },
+    },
+  });
+}
 
 function setLoading(on) {
   document.getElementById('cal-loading').classList.toggle('hidden', !on);
