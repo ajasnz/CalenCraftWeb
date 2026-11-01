@@ -476,6 +476,35 @@ def source_toggle(calendar_slug, source_id):
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
 
 
+@ui_bp.route("/calendars/<calendar_slug>/refresh", methods=["POST"])
+@login_required
+def calendar_refresh(calendar_slug):
+    """Drop this calendar's cached feeds and re-fetch its sources now.
+
+    Rebuilding the default view re-fetches every enabled source, which also refreshes the
+    per-source health shown on the Sources tab.
+    """
+    from app.functions import cache as feed_cache
+    db = current_app.db
+    cal = db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    feed_cache.invalidate_prefix(f"feed:{session['user_slug']}:{calendar_slug}:")
+    try:
+        now = datetime.datetime.now()
+        builder = CalendarBuilder()
+        builder.db = db
+        builder.build(
+            user_slug=session["user_slug"], calendar_slug=calendar_slug, view_slug="default",
+            expansion_start=now - datetime.timedelta(days=int(cal.get("expansion_days_behind") or 0)),
+            expansion_end=now + datetime.timedelta(days=int(cal.get("expansion_days_ahead") or 180)),
+        )
+        flash("Feeds refreshed — sources were re-fetched.", "success")
+    except Exception as e:
+        flash(f"Cache cleared, but re-fetching failed: {e}", "error")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
+
+
 @ui_bp.route("/calendars/<calendar_slug>/sources/<int:source_id>/test", methods=["POST"])
 @login_required
 def source_test(calendar_slug, source_id):
