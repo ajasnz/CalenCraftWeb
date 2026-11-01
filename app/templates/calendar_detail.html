@@ -13,7 +13,13 @@
   </div>
   <div class="cal-hero-links">
     {# Feed URL chip #}
-    {% if cal.share_ics and cal.default_view_enabled %}
+    {% if cal.share_ics and cal.default_view_enabled and cal.feed_token_required %}
+    <div class="url-chip">
+      <span class="url-chip-label">Feed</span>
+      <span class="url-chip-url" style="color:var(--muted)">Token required</span>
+      <a class="url-chip-btn is-link" href="?tab=sharing#feed-access">Manage →</a>
+    </div>
+    {% elif cal.share_ics and cal.default_view_enabled %}
     <div class="url-chip">
       <span class="url-chip-label">Feed</span>
       <span class="url-chip-url" id="chip-feed-default">{{ request.host_url }}feed/{{ user_slug }}/{{ cal.slug }}/default</span>
@@ -448,6 +454,70 @@
       <button type="submit" class="btn">Save Sharing Settings</button>
     </div>
   </form>
+
+  <div class="form-card" id="feed-access" style="margin-top:1.25rem">
+    <div class="form-card-title">Subscription access</div>
+    {% if new_feed_token %}
+    <div class="flash flash-success" style="display:block">
+      <strong>Token “{{ new_feed_token.label }}” created.</strong> Copy this subscription URL now. It won't be shown again.
+      <div class="feed-url-box" style="margin-top:.6rem">
+        <code id="new-token-url">{{ new_feed_token.url }}</code>
+        <button type="button" class="btn btn-sm btn-ghost" onclick="copyUrl('new-token-url', this)">Copy</button>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if cal.feed_token_required %}
+    <p class="hint" style="margin-bottom:.7rem"><strong>Tokens are required.</strong> Feed URLs without a valid token return “not found”.</p>
+    <form method="post" action="{{ url_for('ui.feed_token_require', calendar_slug=cal.slug) }}" style="display:inline">
+      <input type="hidden" name="required" value="0">
+      <button class="btn btn-sm btn-ghost">Allow anyone with the link</button>
+    </form>
+    {% else %}
+    <p class="hint" style="margin-bottom:.7rem">Off: anyone who has the feed URL can subscribe. Turn this on to require a secret token that you can revoke per subscriber.</p>
+    <form method="post" action="{{ url_for('ui.feed_token_require', calendar_slug=cal.slug) }}" style="display:inline"
+          onsubmit="return confirm('Existing subscribers using the plain feed URL will stop receiving events until you give them a tokenised URL. Continue?')">
+      <input type="hidden" name="required" value="1">
+      <button class="btn btn-sm" {% if not feed_tokens %}disabled title="Create a token first"{% endif %}>Require a token</button>
+    </form>
+    {% endif %}
+
+    {% if feed_tokens %}
+    <div class="table-wrap" style="margin-top:1rem">
+      <table>
+        <thead><tr><th>Label</th><th>Works for</th><th>Token</th><th>Created</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+        {% for k in feed_tokens %}
+        <tr>
+          <td>{{ k.label or '—' }}</td>
+          <td>{{ 'All views' if not k.view_slug else (k.view_slug if k.view_slug != 'default' else 'Default view') }}</td>
+          <td><code>{{ k.token_prefix }}…</code></td>
+          <td>{{ k.created_at|timeago }}</td>
+          <td>{% if k.last_used_at %}{{ k.last_used_at|timeago }} · {{ k.use_count }}×{% else %}never{% endif %}</td>
+          <td class="row-actions">
+            <form method="post" action="{{ url_for('ui.feed_token_revoke', calendar_slug=cal.slug, token_id=k.id) }}" onsubmit="return confirm('Revoke this token? Anyone using it will stop receiving the feed.')">
+              <button class="btn btn-sm btn-danger">Revoke</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('ui.feed_token_create', calendar_slug=cal.slug) }}" style="margin-top:1.1rem">
+      <label for="token-label">New token: who is it for?</label>
+      <input id="token-label" name="label" type="text" maxlength="80" placeholder="e.g. Alice's phone">
+      <label for="token-view">Works for</label>
+      <select id="token-view" name="view">
+        <option value="">All views</option>
+        <option value="default">Default view only</option>
+        {% for v in views %}<option value="{{ v.slug }}">{{ v.title }} only</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-ghost">Create token</button>
+    </form>
+  </div>
 </section>
 
 {# ── ADVANCED ── #}

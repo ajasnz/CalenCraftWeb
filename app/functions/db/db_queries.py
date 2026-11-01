@@ -55,6 +55,22 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "feed_tokens_delete_for_calendar": "DELETE FROM feed_tokens WHERE calendar_id = ?",
+    "feed_token_insert": """
+        INSERT INTO feed_tokens (calendar_id, view_slug, label, token_hash, token_prefix, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+    "feed_tokens_for_calendar": """
+        SELECT id, view_slug, label, token_prefix, created_at, last_used_at, use_count
+        FROM feed_tokens WHERE calendar_id = ? ORDER BY id
+    """,
+    "feed_token_revoke": "DELETE FROM feed_tokens WHERE id = ? AND calendar_id = ?",
+    "feed_token_lookup": """
+        SELECT id FROM feed_tokens
+        WHERE calendar_id = ? AND token_hash = ? AND (view_slug IS NULL OR view_slug = ?)
+    """,
+    "feed_token_touch": "UPDATE feed_tokens SET last_used_at = ?, use_count = use_count + 1 WHERE id = ?",
+    "calendar_set_feed_token_required": "UPDATE calendars SET feed_token_required = ? WHERE id = ?",
     "calendar_record_feed_hit": """
         UPDATE calendars SET feed_hits = feed_hits + 1, last_feed_at = ? WHERE id = ?
     """,

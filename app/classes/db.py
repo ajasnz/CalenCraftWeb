@@ -249,7 +249,50 @@ class CalendarDB:
         self._execute(self._named("calendar_record_feed_hit"), (when_iso, calendar_id))
 
     def delete_calendar(self, calendar_id):
+        self._execute(self._named("feed_tokens_delete_for_calendar"), (calendar_id,), commit=False)
         self._execute(self._named("calendar_delete"), (calendar_id,))
+
+    # ------------------------------------------------------------------
+    # Feed access tokens (only a SHA-256 of each token is ever stored)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _hash_token(token):
+        import hashlib
+        return hashlib.sha256((token or "").encode()).hexdigest()
+
+    def create_feed_token(self, calendar_id, view_slug, label):
+        """Create a token and return it in plaintext. This is the only time it is available."""
+        import secrets
+        import datetime
+        token = "cct_" + secrets.token_urlsafe(32)
+        self._execute(self._named("feed_token_insert"), (
+            calendar_id, view_slug or None, (label or "").strip()[:80], self._hash_token(token),
+            token[:8], datetime.datetime.utcnow().isoformat(timespec="seconds"),
+        ))
+        return token
+
+    def list_feed_tokens(self, calendar_id):
+        return self._fetchall(self._named("feed_tokens_for_calendar"), (calendar_id,))
+
+    def revoke_feed_token(self, calendar_id, token_id):
+        self._execute(self._named("feed_token_revoke"), (token_id, calendar_id))
+
+    def set_feed_token_required(self, calendar_id, required):
+        self._execute(self._named("calendar_set_feed_token_required"), (1 if required else 0, calendar_id))
+
+    def verify_feed_token(self, calendar_id, view_slug, token):
+        """True if `token` is valid for this calendar and view. Records the use."""
+        import datetime
+        if not token or len(token) > 200:
+            return False
+        row = self._fetchone(self._named("feed_token_lookup"),
+                             (calendar_id, self._hash_token(token), view_slug))
+        if not row:
+            return False
+        self._execute(self._named("feed_token_touch"),
+                      (datetime.datetime.utcnow().isoformat(timespec="seconds"), row["id"]))
+        return True
 
     def duplicate_calendar(self, calendar_id, new_slug, new_title):
         """Copy a calendar with its settings, sources, views, filters and rules.
@@ -268,7 +311,7 @@ class CalendarDB:
         try:
             src = self._fetchone("SELECT * FROM calendars WHERE id = ?", (calendar_id,))
             # Per-calendar usage stats (feed_hits, last_feed_at) must not carry over to the copy.
-            new_id = copy_row("calendars", src, {"id", "feed_hits", "last_feed_at"},
+            new_id = copy_row("calendars", src, {"id", "feed_hits", "last_feed_at", "feed_token_required"},
                               {"slug": new_slug, "title": new_title})
 
             source_map = {}
