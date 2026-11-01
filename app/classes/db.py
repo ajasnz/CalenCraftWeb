@@ -217,6 +217,18 @@ class CalendarDB:
     def update_user_profile(self, user_id, display_name, email):
         self._execute(self._named("user_update_profile"), (display_name, email or None, user_id))
 
+    def get_totp(self, user_id):
+        return self._fetchone(self._named("user_totp_get"), (user_id,))
+
+    def enable_totp(self, user_id, secret, last_step, recovery_json):
+        self._execute(self._named("user_totp_enable"), (secret, last_step, recovery_json, user_id))
+
+    def disable_totp(self, user_id):
+        self._execute(self._named("user_totp_disable"), (user_id,))
+
+    def update_totp_state(self, user_id, last_step, recovery_json):
+        self._execute(self._named("user_totp_update"), (last_step, recovery_json, user_id))
+
     def update_user_password(self, user_id, password_hash):
         self._execute(self._named("user_update_password"), (password_hash, user_id))
 

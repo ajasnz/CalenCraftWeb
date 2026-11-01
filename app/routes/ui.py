@@ -8,6 +8,7 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.classes.calendar import CalendarBuilder, ical_events_to_dicts
+from app.functions import totp as totp_lib
 
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
@@ -899,9 +900,53 @@ def profile():
                 db.update_user_password(session["user_id"], generate_password_hash(new_pw))
                 flash("Password changed.", "success")
 
+        elif action == "totp_start":
+            if db.get_totp(session["user_id"])["totp_enabled"]:
+                flash("Two-factor authentication is already on.", "error")
+            else:
+                session["totp_setup_secret"] = totp_lib.generate_secret()
+
+        elif action == "totp_cancel":
+            session.pop("totp_setup_secret", None)
+
+        elif action == "totp_confirm":
+            secret = session.get("totp_setup_secret")
+            step = totp_lib.verify(secret, request.form.get("code", "")) if secret else None
+            if step is None:
+                flash("That code didn't match. Check the time on your device and try again.", "error")
+            else:
+                codes, hashed = totp_lib.generate_recovery_codes()
+                db.enable_totp(session["user_id"], secret, step, hashed)
+                session.pop("totp_setup_secret", None)
+                session["totp_new_recovery"] = codes
+                flash("Two-factor authentication is on.", "success")
+
+        elif action == "totp_disable":
+            state = db.get_totp(session["user_id"])
+            code = request.form.get("code", "")
+            if not check_password_hash(db.get_user_by_username(user["username"])["password"],
+                                       request.form.get("password", "")):
+                flash("Password is incorrect.", "error")
+            elif not state["totp_enabled"] or (
+                    totp_lib.verify(state["totp_secret"], code, state["totp_last_step"]) is None
+                    and totp_lib.consume_recovery_code(state["totp_recovery"], code) is None):
+                flash("That code isn't valid.", "error")
+            else:
+                db.disable_totp(session["user_id"])
+                flash("Two-factor authentication is off.", "success")
+
         return redirect(url_for("ui.profile"))
 
-    return render_template("profile.html", user=user, nav_calendars=_nav_calendars())
+    state = db.get_totp(session["user_id"])
+    setup_secret = session.get("totp_setup_secret")
+    return render_template(
+        "profile.html", user=user, nav_calendars=_nav_calendars(),
+        totp_enabled=bool(state["totp_enabled"]),
+        totp_remaining=totp_lib.recovery_codes_remaining(state["totp_recovery"]),
+        setup_secret=totp_lib.format_secret(setup_secret) if setup_secret else None,
+        setup_uri=totp_lib.provisioning_uri(setup_secret, user["username"]) if setup_secret else None,
+        new_recovery=session.pop("totp_new_recovery", None),
+    )
 
 
 # ------------------------------------------------------------------
@@ -913,6 +958,18 @@ def profile():
 def admin_users():
     users = current_app.db.get_users()
     return render_template("admin_users.html", users=users, nav_calendars=_nav_calendars())
+
+
+@ui_bp.route("/admin/users/<int:user_id>/reset-2fa", methods=["POST"])
+@admin_required
+def admin_user_reset_2fa(user_id):
+    db = current_app.db
+    target = db.get_user_by_id(user_id)
+    if not target:
+        abort(404)
+    db.disable_totp(user_id)
+    flash(f"Two-factor authentication reset for {target['username']}.", "success")
+    return redirect(url_for("ui.admin_users"))
 
 
 @ui_bp.route("/admin/users/new", methods=["GET", "POST"])

@@ -1,15 +1,15 @@
 queries = {
     # --- Users ---
     "users_list": """
-        SELECT id, slug, username, email, display_name, state, is_admin
+        SELECT id, slug, username, email, display_name, state, is_admin, totp_enabled
         FROM users ORDER BY username
     """,
     "user_by_id": """
-        SELECT id, slug, username, email, display_name, state, is_admin
+        SELECT id, slug, username, email, display_name, state, is_admin, totp_enabled
         FROM users WHERE id = ?
     """,
     "user_by_username": """
-        SELECT id, slug, username, email, display_name, password, state, is_admin
+        SELECT id, slug, username, email, display_name, password, state, is_admin, totp_enabled
         FROM users WHERE username = ?
     """,
     "user_by_slug": """
@@ -21,6 +21,20 @@ queries = {
         VALUES (?, ?, ?, ?, ?, ?)
     """,
     "user_delete": "DELETE FROM users WHERE id = ?",
+    "user_totp_get": """
+        SELECT totp_secret, totp_enabled, totp_last_step, totp_recovery FROM users WHERE id = ?
+    """,
+    "user_totp_enable": """
+        UPDATE users SET totp_secret = ?, totp_enabled = 1, totp_last_step = ?, totp_recovery = ?
+        WHERE id = ?
+    """,
+    "user_totp_disable": """
+        UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_last_step = 0, totp_recovery = NULL
+        WHERE id = ?
+    """,
+    "user_totp_update": """
+        UPDATE users SET totp_last_step = ?, totp_recovery = ? WHERE id = ?
+    """,
     "user_update_profile": """
         UPDATE users SET display_name=?, email=? WHERE id=?
     """,
