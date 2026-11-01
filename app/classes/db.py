@@ -252,7 +252,9 @@ class CalendarDB:
 
         try:
             src = self._fetchone("SELECT * FROM calendars WHERE id = ?", (calendar_id,))
-            new_id = copy_row("calendars", src, {"id"}, {"slug": new_slug, "title": new_title})
+            # Per-calendar usage stats (feed_hits, last_feed_at) must not carry over to the copy.
+            new_id = copy_row("calendars", src, {"id", "feed_hits", "last_feed_at"},
+                              {"slug": new_slug, "title": new_title})
 
             source_map = {}
             for s in self._fetchall(
