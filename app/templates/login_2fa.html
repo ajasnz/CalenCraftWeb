@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% import '_icons.html' as icons %}
+{% block title %}Two-factor code — CalenCraft{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <div class="auth-logo">{{ icons.icon('calendar-big') }}</div>
+  <h1>Two-factor code</h1>
+  <p class="tagline">Enter the 6-digit code from your authenticator app, or a recovery code.</p>
+  <form method="post" id="totp-form">
+    <label for="code">Code</label>
+    <input id="code" name="code" type="text" autocomplete="one-time-code" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" required autofocus>
+    <button type="submit" class="btn" style="width:100%;margin-top:1.25rem;justify-content:center">Verify</button>
+  </form>
+  <p style="text-align:center;margin-top:1rem"><a href="{{ url_for('auth.login') }}">Back to log in</a></p>
+</div>
+{% endblock %}

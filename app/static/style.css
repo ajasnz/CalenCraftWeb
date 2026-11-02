@@ -833,3 +833,6 @@ main:focus { outline: none; }
 
 .dash-sort select { width: auto; padding: .5rem 2rem .5rem .75rem; font-size: .85rem; }
 @media (max-width: 600px) { .dash-tools { flex-wrap: wrap; } }
+
+.totp-secret { display: inline-block; padding: .5rem .75rem; font-size: 1rem; letter-spacing: .08em; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; word-break: break-all; }
+.recovery-codes { margin: .6rem 0 1rem; padding: .75rem 1rem; font: 600 .95rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; }

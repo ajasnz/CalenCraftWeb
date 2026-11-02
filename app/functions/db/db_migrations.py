@@ -154,4 +154,17 @@ migrations = {
             ALTER TABLE calendars ADD COLUMN last_feed_at TEXT;
         """,
     },
+    5: {
+        "id": 5,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "TOTP two-factor authentication",
+        "description": "Per-user TOTP secret, enabled flag, replay-protection step and hashed recovery codes.",
+        "sql": """
+            ALTER TABLE users ADD COLUMN totp_secret TEXT;
+            ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE users ADD COLUMN totp_recovery TEXT;
+        """,
+    },
 }
