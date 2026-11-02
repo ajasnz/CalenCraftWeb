@@ -41,7 +41,7 @@
         <span class="cal-stat"><span class="cal-stat-icon">{{ icons.icon('grid') }}</span> {{ cal.view_count }} view{{ 's' if cal.view_count != 1 }}</span>
         {% if cal.share_ics %}<span class="cal-badge cal-badge-ics">ICS</span>{% endif %}
         {% if cal.share_viewer %}<span class="cal-badge cal-badge-viewer">Viewer</span>{% endif %}
-        {% if cal.failing_sources %}<span class="cal-badge cal-badge-warn" title="Last fetch failed for {{ cal.failing_sources }} source(s)">{{ cal.failing_sources }} failing</span>{% endif %}
+        {% if cal.failing_sources %}<span class="cal-badge cal-badge-warn" title="{{ cal.failing_detail or 'Last fetch failed' }}">{{ cal.failing_sources }} failing</span>{% endif %}
       </div>
       <div class="cal-card-activity">
         {% if cal.last_feed_at %}Feed fetched {{ cal.last_feed_at|timeago }} · {{ cal.feed_hits }} total{% else %}Feed not fetched yet{% endif %}
