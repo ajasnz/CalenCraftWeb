@@ -20,6 +20,11 @@
     <td>{% if u.is_admin %}<span style="color:var(--primary)">{{ icons.icon('check') }}</span>{% endif %}</td>
     <td class="row-actions">
       <a class="btn btn-sm btn-secondary" href="{{ url_for('ui.admin_user_reset_password', user_id=u.id) }}">Reset Password</a>
+      {% if u.totp_enabled %}
+      <form method="post" action="{{ url_for('ui.admin_user_reset_2fa', user_id=u.id) }}" onsubmit="return confirm('Turn off two-factor authentication for {{ u.username }}?')">
+        <button class="btn btn-sm btn-secondary">Reset 2FA</button>
+      </form>
+      {% endif %}
       {% if u.id != session.user_id %}
       <form method="post" action="{{ url_for('ui.admin_user_delete', user_id=u.id) }}" onsubmit="return confirm('Delete user {{ u.username }}?')">
         <button class="btn btn-sm btn-danger">Delete</button>

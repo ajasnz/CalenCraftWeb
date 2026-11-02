@@ -6,11 +6,11 @@
   <div class="auth-logo">{{ icons.icon('calendar-big') }}</div>
   <h1>CalenCraft</h1>
   <p class="tagline">Programmable calendar feeds</p>
-  <form method="post">
+  <form method="post" id="login-form">
     <label for="username">Username</label>
-    <input id="username" name="username" type="text" autocomplete="username" required autofocus>
+    <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="next" required autofocus>
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <input id="password" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" required>
     <button type="submit" class="btn" style="width:100%;margin-top:1.25rem;justify-content:center">Log in</button>
   </form>
 </div>

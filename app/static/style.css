@@ -823,12 +823,6 @@ kbd {
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
 /* ── Accessibility ── */
-.skip-link {
-  position: fixed; top: -3rem; left: .75rem; z-index: 2000;
-  background: var(--primary); color: #fff; padding: .5rem .9rem; border-radius: var(--radius-sm);
-  font-weight: 600; transition: top .15s;
-}
-.skip-link:focus { top: .6rem; color: #fff; text-decoration: none; }
 main:focus { outline: none; }
 :focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .btn:focus-visible, .sidebar-item:focus-visible, .tab:focus-visible { outline-offset: 1px; }
@@ -843,3 +837,5 @@ main:focus { outline: none; }
 .import-summary { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; padding: 0; }
 .import-sources { padding-left: 1.1rem; font-size: .82rem; overflow-wrap: anywhere; }
 .import-warning { margin-top: .9rem; padding: .65rem .9rem; font-size: .875rem; background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); border-radius: var(--radius-sm); }
+.totp-secret { display: inline-block; padding: .5rem .75rem; font-size: 1rem; letter-spacing: .08em; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; word-break: break-all; }
+.recovery-codes { margin: .6rem 0 1rem; padding: .75rem 1rem; font: 600 .95rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; }

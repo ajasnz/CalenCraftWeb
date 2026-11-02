@@ -19,6 +19,41 @@
   </form>
 </div>
 
+<div class="form-card" id="two-factor">
+  <div class="form-card-title">Two-factor authentication</div>
+  {% if new_recovery %}
+  <div class="flash flash-success" style="display:block">
+    <strong>Save these recovery codes now.</strong> Each works once if you lose your authenticator. They won't be shown again.
+  </div>
+  <pre class="recovery-codes">{{ new_recovery|join('\n') }}</pre>
+  {% endif %}
+  {% if totp_enabled %}
+  <p class="hint" style="margin-bottom:.8rem">On. {{ totp_remaining }} recovery code{{ '' if totp_remaining == 1 else 's' }} left.</p>
+  <form method="post">
+    <input type="hidden" name="_action" value="totp_disable">
+    <label for="totp_disable_password">Password</label>
+    <input id="totp_disable_password" name="password" type="password" required autocomplete="current-password">
+    <label for="totp_disable_code">Authenticator or recovery code</label>
+    <input id="totp_disable_code" name="code" type="text" required autocomplete="off" autocapitalize="none" spellcheck="false">
+    <button type="submit" class="btn btn-danger">Turn off</button>
+  </form>
+  {% elif setup_secret %}
+  <p class="hint" style="margin-bottom:.6rem">Add this key to your authenticator app (Bitwarden, Google Authenticator, 1Password…), then enter the 6-digit code it shows.</p>
+  <p><code class="totp-secret">{{ setup_secret }}</code></p>
+  <p style="margin:.5rem 0 1rem"><a href="{{ setup_uri }}">Open in authenticator app</a></p>
+  <form method="post">
+    <input type="hidden" name="_action" value="totp_confirm">
+    <label for="totp_code">6-digit code</label>
+    <input id="totp_code" name="code" type="text" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" required autocomplete="one-time-code">
+    <button type="submit" class="btn">Confirm and turn on</button>
+  </form>
+  <form method="post" style="margin-top:.6rem"><input type="hidden" name="_action" value="totp_cancel"><button class="btn btn-ghost btn-sm">Cancel</button></form>
+  {% else %}
+  <p class="hint" style="margin-bottom:.8rem">Protect your account with a code from an authenticator app in addition to your password.</p>
+  <form method="post"><input type="hidden" name="_action" value="totp_start"><button type="submit" class="btn">Set up</button></form>
+  {% endif %}
+</div>
+
 <div class="form-card">
   <div class="form-card-title">Change Password</div>
   <form method="post">
