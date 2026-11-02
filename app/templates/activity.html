@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Activity — CalenCraft{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Activity</h2>
+</div>
+<p class="hint" style="margin-bottom:.9rem">
+  {% if session.is_admin %}Everything that has happened across all accounts.{% else %}What has happened on your account.{% endif %}
+  Passwords, tokens and source URLs are never recorded.
+</p>
+
+<form method="get" class="dash-tools">
+  <label class="dash-search" style="max-width:340px">
+    <span class="sr-only">Filter activity</span>
+    <input type="search" name="q" value="{{ q }}" placeholder="Filter, e.g. login, token, calendar:work" autocomplete="off">
+  </label>
+  <button class="btn btn-ghost btn-sm">Filter</button>
+  {% if q %}<a class="btn btn-ghost btn-sm" href="{{ url_for('ui.activity') }}">Clear</a>{% endif %}
+</form>
+
+{% if rows %}
+<div class="table-wrap">
+  <table class="activity-table">
+    <thead><tr><th>When</th>{% if session.is_admin %}<th>Who</th>{% endif %}<th>What</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td title="{{ r.ts }} UTC">{{ r.ts|timeago }}</td>
+      {% if session.is_admin %}<td>{{ r.username or '—' }}</td>{% endif %}
+      <td><span class="act act-{{ r.action.split('.')[0] }}">{{ r.action.replace('.', ' · ').replace('_', ' ') }}</span></td>
+      <td>{{ r.target or '' }}</td>
+      <td>{{ r.detail or '' }}</td>
+      <td><code>{{ r.ip or '' }}</code></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="activity-pager">
+  {% if page > 1 %}<a class="btn btn-ghost btn-sm" href="{{ url_for('ui.activity', page=page-1, q=q or None) }}">← Newer</a>{% endif %}
+  {% if has_next %}<a class="btn btn-ghost btn-sm" href="{{ url_for('ui.activity', page=page+1, q=q or None) }}">Older →</a>{% endif %}
+</div>
+{% else %}
+<div class="empty-state"><h3>No activity{% if q %} matching “{{ q }}”{% endif %}</h3></div>
+{% endif %}
+{% endblock %}

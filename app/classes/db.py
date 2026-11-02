@@ -258,6 +258,8 @@ class CalendarDB:
         try:
             source_ids = [r["source_id"] for r in self._fetchall(
                 "SELECT source_id FROM calendar_sources WHERE calendar_id = ?", (calendar_id,))]
+            self._execute(self._named("feed_tokens_delete_for_calendar"), (calendar_id,), commit=False)
+            self._execute(self._named("event_overrides_delete_for_calendar"), (calendar_id,), commit=False)
             for table in ("rules", "filters", "views", "calendar_sources"):   # fixed names, never user input
                 self._execute("DELETE FROM %s WHERE calendar_id = ?" % table, (calendar_id,), commit=False)
             for sid in source_ids:
@@ -269,6 +271,107 @@ class CalendarDB:
         except Exception:
             self.conn.rollback()
             raise
+
+    # ------------------------------------------------------------------
+    # Event overrides
+    # ------------------------------------------------------------------
+
+    MAX_OVERRIDES_PER_CALENDAR = 500
+
+    def add_event_override(self, calendar_id, view_slug, uid, instance_start, action, new_title, label):
+        """Create (or replace) the override for exactly this target. Returns its id."""
+        import datetime
+        try:
+            self._execute(self._named("event_override_clear_target"),
+                          (calendar_id, uid, view_slug or "", instance_start or ""), commit=False)
+            count = self._fetchone("SELECT COUNT(*) AS n FROM event_overrides WHERE calendar_id = ?",
+                                   (calendar_id,))["n"]
+            if count >= self.MAX_OVERRIDES_PER_CALENDAR:
+                raise ValueError("too many overrides")
+            new_id = self._execute(self._named("event_override_insert"), (
+                calendar_id, view_slug or None, uid, instance_start or None, action, new_title or None,
+                (label or "")[:200], datetime.datetime.utcnow().isoformat(timespec="seconds")), commit=False)
+            self.conn.commit()
+            return new_id
+        except Exception:
+            self.conn.rollback()
+            raise
+
+    def list_event_overrides(self, calendar_id):
+        return self._fetchall(self._named("event_overrides_all"), (calendar_id,))
+
+    def get_event_overrides_for(self, user_slug, calendar_slug, view_slug):
+        """Overrides that apply to this view: all-views ones plus ones for this exact view."""
+        return self._fetchall(self._named("event_overrides_for_view"), (user_slug, calendar_slug, view_slug))
+
+    def delete_event_override(self, calendar_id, override_id):
+        self._execute(self._named("event_override_delete"), (override_id, calendar_id))
+
+    # ------------------------------------------------------------------
+    # Audit log
+    # ------------------------------------------------------------------
+
+    def add_audit(self, user_id, username, action, target, detail, ip, keep):
+        import datetime
+        self._execute(self._named("audit_insert"), (
+            datetime.datetime.utcnow().isoformat(timespec="seconds"),
+            user_id, username, action, target, detail, ip), commit=False)
+        self._execute(self._named("audit_prune"), (keep,))     # cheap: PK range delete
+
+    def list_audit(self, user_id=None, q="", limit=51, offset=0):
+        sql, params = "SELECT * FROM audit_log WHERE 1=1", []
+        if user_id is not None:
+            sql += " AND user_id = ?"
+            params.append(user_id)
+        if q:
+            like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            sql += " AND (action LIKE ? ESCAPE '\\' OR target LIKE ? ESCAPE '\\' OR detail LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\')"
+            params += [like] * 4
+        sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+        params += [limit, offset]
+        return self._fetchall(sql, params)
+
+    # ------------------------------------------------------------------
+    # Feed access tokens (only a SHA-256 of each token is ever stored)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _hash_token(token):
+        import hashlib
+        return hashlib.sha256((token or "").encode()).hexdigest()
+
+    def create_feed_token(self, calendar_id, view_slug, label):
+        """Create a token and return it in plaintext. This is the only time it is available."""
+        import secrets
+        import datetime
+        token = "cct_" + secrets.token_urlsafe(32)
+        self._execute(self._named("feed_token_insert"), (
+            calendar_id, view_slug or None, (label or "").strip()[:80], self._hash_token(token),
+            token[:8], datetime.datetime.utcnow().isoformat(timespec="seconds"),
+        ))
+        return token
+
+    def list_feed_tokens(self, calendar_id):
+        return self._fetchall(self._named("feed_tokens_for_calendar"), (calendar_id,))
+
+    def revoke_feed_token(self, calendar_id, token_id):
+        self._execute(self._named("feed_token_revoke"), (token_id, calendar_id))
+
+    def set_feed_token_required(self, calendar_id, required):
+        self._execute(self._named("calendar_set_feed_token_required"), (1 if required else 0, calendar_id))
+
+    def verify_feed_token(self, calendar_id, view_slug, token):
+        """True if `token` is valid for this calendar and view. Records the use."""
+        import datetime
+        if not token or len(token) > 200:
+            return False
+        row = self._fetchone(self._named("feed_token_lookup"),
+                             (calendar_id, self._hash_token(token), view_slug))
+        if not row:
+            return False
+        self._execute(self._named("feed_token_touch"),
+                      (datetime.datetime.utcnow().isoformat(timespec="seconds"), row["id"]))
+        return True
 
     def import_calendar(self, user_id, clean, slug, title):
         """Create a calendar from a config validated by config_import. All-or-nothing.
@@ -334,7 +437,7 @@ class CalendarDB:
         try:
             src = self._fetchone("SELECT * FROM calendars WHERE id = ?", (calendar_id,))
             # Per-calendar usage stats (feed_hits, last_feed_at) must not carry over to the copy.
-            new_id = copy_row("calendars", src, {"id", "feed_hits", "last_feed_at"},
+            new_id = copy_row("calendars", src, {"id", "feed_hits", "last_feed_at", "feed_token_required"},
                               {"slug": new_slug, "title": new_title})
 
             source_map = {}
@@ -359,6 +462,8 @@ class CalendarDB:
                         "view_id": view_map.get(r["view_id"]),
                         "source_id": source_map.get(r["source_id"]),
                     })
+            for o in self._fetchall("SELECT * FROM event_overrides WHERE calendar_id = ?", (calendar_id,)):
+                copy_row("event_overrides", o, {"id"}, {"calendar_id": new_id})
             self.conn.commit()
         except Exception:
             self.conn.rollback()

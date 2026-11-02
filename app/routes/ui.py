@@ -7,8 +7,9 @@ from flask import (
     session, current_app, flash, abort, jsonify,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.classes.calendar import CalendarBuilder, ical_events_to_dicts
+from app.classes.calendar import CalendarBuilder, ical_events_to_dicts, pick_override
 from app.functions import totp as totp_lib
+from app.functions.audit import audit
 
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
@@ -203,6 +204,22 @@ def dashboard():
 # Calendars
 # ------------------------------------------------------------------
 
+@ui_bp.route("/activity")
+@login_required
+def activity():
+    """Audit trail: admins see everyone's activity, everyone else only their own."""
+    db = current_app.db
+    q = request.args.get("q", "").strip()[:60]
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    per = 50
+    rows = db.list_audit(None if session.get("is_admin") else session["user_id"], q, per + 1, (page - 1) * per)
+    return render_template("activity.html", rows=rows[:per], has_next=len(rows) > per, page=page, q=q,
+                           nav_calendars=_nav_calendars())
+
+
 @ui_bp.route("/calendars/new", methods=["GET", "POST"])
 @login_required
 def calendar_new():
@@ -218,6 +235,7 @@ def calendar_new():
         except Exception:
             flash("A calendar with that name already exists.", "error")
             return render_template("calendar_new.html", nav_calendars=_nav_calendars())
+        audit("calendar.created", f"calendar:{slug}", title)
         return redirect(url_for("ui.calendar_detail", calendar_slug=slug))
     return render_template("calendar_new.html", nav_calendars=_nav_calendars())
 
@@ -263,6 +281,7 @@ def calendar_detail(calendar_slug):
             expansion_days_behind=behind,
             default_view_enabled=1 if f.get("default_view_enabled") else 0,
         )
+        audit("calendar.settings_changed", f"calendar:{calendar_slug}")
         flash("Settings saved.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="advanced"))
 
@@ -298,6 +317,7 @@ def calendar_detail(calendar_slug):
             viewer_show_location=1 if f.get("viewer_show_location") else 0,
             viewer_hide_private=1 if f.get("viewer_hide_private") else 0,
         )
+        audit("calendar.sharing_changed", f"calendar:{calendar_slug}")
         flash("Sharing settings saved.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing"))
 
@@ -308,6 +328,7 @@ def calendar_detail(calendar_slug):
     return render_template(
         "calendar_detail.html",
         cal=cal, sources=sources, views=views, rules=rules, filters=filters,
+        feed_tokens=db.list_feed_tokens(cal["id"]), new_feed_token=session.pop("new_feed_token", None),
         views_by_id=views_by_id, sources_by_id=sources_by_id,
         sharing_links=sharing_links,
         active_tab=active_tab,
@@ -315,6 +336,64 @@ def calendar_detail(calendar_slug):
         user_slug=session["user_slug"],
         **_label_maps(),
     )
+
+
+def _owned_calendar_or_404(calendar_slug):
+    cal = current_app.db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    return cal
+
+
+def _to_access_tab(calendar_slug):
+    return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing") + "#feed-access")
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/create", methods=["POST"])
+@login_required
+def feed_token_create(calendar_slug):
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    scope = (request.form.get("view") or "").strip()
+    if scope and scope != "default" and not db.get_view_by_slug(session["user_slug"], calendar_slug, scope):
+        flash("That view doesn't exist.", "error")
+        return _to_access_tab(calendar_slug)
+    label = (request.form.get("label") or "").strip()[:80]
+    token = db.create_feed_token(cal["id"], scope or None, label)
+    audit("token.created", f"calendar:{calendar_slug}", label or "(no label)")
+    url_view = scope or "default"
+    session["new_feed_token"] = {
+        "label": label or "Untitled token",
+        "url": f"{request.host_url}feed/{session['user_slug']}/{calendar_slug}/{url_view}?token={token}",
+    }
+    return _to_access_tab(calendar_slug)
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/<int:token_id>/revoke", methods=["POST"])
+@login_required
+def feed_token_revoke(calendar_slug, token_id):
+    cal = _owned_calendar_or_404(calendar_slug)
+    current_app.db.revoke_feed_token(cal["id"], token_id)
+    audit("token.revoked", f"calendar:{calendar_slug}", f"token id {token_id}")
+    flash("Token revoked. Anyone using it will stop receiving the feed.", "success")
+    return _to_access_tab(calendar_slug)
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/require", methods=["POST"])
+@login_required
+def feed_token_require(calendar_slug):
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    want = request.form.get("required") == "1"
+    if want and not db.list_feed_tokens(cal["id"]):
+        flash("Create a token first, otherwise every subscriber would be locked out.", "error")
+        return _to_access_tab(calendar_slug)
+    db.set_feed_token_required(cal["id"], want)
+    from app.functions import cache as feed_cache
+    feed_cache.invalidate_prefix(f"feed:{session['user_slug']}:{calendar_slug}:")
+    audit("token.requirement_changed", f"calendar:{calendar_slug}", "required" if want else "not required")
+    flash("Subscribers now need a token." if want else "Anyone with the feed URL can subscribe again.", "success")
+    return _to_access_tab(calendar_slug)
 
 
 def _validate_uploaded_config(raw_text):
@@ -378,6 +457,7 @@ def calendar_import_confirm():
         current_app.logger.exception("Calendar import failed")
         flash("The import failed and nothing was created.", "error")
         return redirect(url_for("ui.calendar_new"))
+    audit("calendar.imported", f"calendar:{slugify(title)}", title)
     flash(f"Imported “{title}”. Sources have not been fetched yet — use Refresh now on the Sources tab.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
@@ -396,11 +476,12 @@ def calendar_duplicate(calendar_slug):
         n += 1
         title = f"{base_title} {n}"
     new_id = db.duplicate_calendar(cal["id"], slugify(title), title)
+    audit("calendar.duplicated", f"calendar:{calendar_slug}", title)
     flash(f"Duplicated as “{title}”. Source fetch status starts fresh.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
-_EXPORT_CAL_SKIP = {"id", "user_id", "state", "viewer_password", "feed_hits", "last_feed_at"}
+_EXPORT_CAL_SKIP = {"id", "user_id", "state", "viewer_password", "feed_hits", "last_feed_at", "feed_token_required"}
 _EXPORT_VIEW_SKIP = {"id", "calendar_id", "state", "viewer_password"}
 
 
@@ -443,6 +524,7 @@ def calendar_export(calendar_slug):
     if not cal:
         abort(404)
     payload = build_calendar_export(db, session["user_slug"], cal)
+    audit("calendar.exported", f"calendar:{calendar_slug}")
     resp = current_app.response_class(json.dumps(payload, indent=2, default=str), mimetype="application/json")
     resp.headers["Content-Disposition"] = f'attachment; filename="{calendar_slug}-calencraft.json"'
     resp.headers["Cache-Control"] = "no-store"
@@ -457,6 +539,7 @@ def calendar_delete(calendar_slug):
     if not cal:
         abort(404)
     db.delete_calendar(cal["id"])
+    audit("calendar.deleted", f"calendar:{calendar_slug}", cal["title"])
     flash("Calendar deleted.", "success")
     return redirect(url_for("ui.dashboard"))
 
@@ -484,6 +567,7 @@ def source_add(calendar_slug):
             return render_template("source_add.html", cal=cal, nav_calendars=_nav_calendars())
         source_id = db.create_source(session["user_id"], url, name)
         db.link_source(cal["id"], source_id)
+        audit("source.added", f"calendar:{calendar_slug}", name or "(unnamed)")
         flash("Source added.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
     return render_template("source_add.html", cal=cal, nav_calendars=_nav_calendars())
@@ -497,6 +581,7 @@ def source_delete(calendar_slug, source_id):
     if not cal:
         abort(404)
     db.unlink_source(cal["id"], source_id)
+    audit("source.removed", f"calendar:{calendar_slug}", f"source id {source_id}")
     flash("Source removed.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
 
@@ -530,6 +615,7 @@ def source_edit(calendar_slug, source_id):
                 flash(f"Invalid URL: {err}", "error")
             else:
                 db.update_source(source_id, name or url, url)
+                audit("source.edited", f"calendar:{calendar_slug}", name or "(unnamed)")
                 flash("Source updated.", "success")
                 return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
     return render_template("source_edit.html", cal=cal, source=source, nav_calendars=_nav_calendars())
@@ -541,6 +627,7 @@ def source_toggle(calendar_slug, source_id):
     db = current_app.db
     _get_source_for_calendar(db, session["user_slug"], calendar_slug, source_id)
     db.toggle_source_enabled(source_id)
+    audit("source.toggled", f"calendar:{calendar_slug}", f"source id {source_id}")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sources"))
 
 
@@ -610,6 +697,7 @@ def view_new(calendar_slug):
             flash("Title is required.", "error")
             return render_template("view_new.html", cal=cal, nav_calendars=_nav_calendars())
         db.create_view(cal["id"], slug, title)
+        audit("view.created", f"calendar:{calendar_slug}", slug)
         flash("View created.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="views"))
     return render_template("view_new.html", cal=cal, nav_calendars=_nav_calendars())
@@ -623,6 +711,7 @@ def view_delete(calendar_slug, view_id):
     if not cal:
         abort(404)
     db.delete_view(view_id)
+    audit("view.deleted", f"calendar:{calendar_slug}", f"view id {view_id}")
     flash("View deleted.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="views"))
 
@@ -679,6 +768,7 @@ def rule_new(calendar_slug):
     sources = db.get_sources(cal["id"])
     if request.method == "POST":
         db.create_rule(calendar_id=cal["id"], **_rule_form_data(request.form))
+        audit("rule.created", f"calendar:{calendar_slug}")
         flash("Rule created.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="rules"))
     return render_template(
@@ -712,6 +802,7 @@ def rule_edit(calendar_slug, rule_id):
              fd["filter_pattern"], fd["filter_action"], fd["include_if_fails"], fd["target_property"],
              fd["action"], fd["target_value"], rule_id),
         )
+        audit("rule.edited", f"calendar:{calendar_slug}", f"rule id {rule_id}")
         flash("Rule updated.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="rules"))
     return render_template(
@@ -731,6 +822,7 @@ def rule_delete(calendar_slug, rule_id):
     if not cal:
         abort(404)
     db.delete_rule(rule_id)
+    audit("rule.deleted", f"calendar:{calendar_slug}", f"rule id {rule_id}")
     flash("Rule deleted.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="rules"))
 
@@ -773,6 +865,7 @@ def filter_new(calendar_slug):
     sources = db.get_sources(cal["id"])
     if request.method == "POST":
         db.create_filter(calendar_id=cal["id"], **_filter_form_data(request.form))
+        audit("filter.created", f"calendar:{calendar_slug}")
         flash("Filter created.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="filters"))
     return render_template(
@@ -803,6 +896,7 @@ def filter_edit(calendar_slug, filter_id):
             (fd["view_id"], fd["source_id"], fd["priority"], fd["property_"], fd["type_"],
              fd["pattern"], fd["action"], fd["include_if_fails"], filter_id),
         )
+        audit("filter.edited", f"calendar:{calendar_slug}", f"filter id {filter_id}")
         flash("Filter updated.", "success")
         return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="filters"))
     return render_template(
@@ -821,6 +915,7 @@ def filter_delete(calendar_slug, filter_id):
     if not cal:
         abort(404)
     db.delete_filter(filter_id)
+    audit("filter.deleted", f"calendar:{calendar_slug}", f"filter id {filter_id}")
     flash("Filter deleted.", "success")
     return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="filters"))
 
@@ -847,14 +942,86 @@ def calendar_upcoming(calendar_slug):
     builder = CalendarBuilder()
     builder.db = db
     try:
+        # Overrides are shown, not applied, so hidden events stay visible here with an undo.
         ical = builder.build(
             user_slug=session["user_slug"], calendar_slug=calendar_slug, view_slug=view_slug,
-            expansion_start=start, expansion_end=end,
+            expansion_start=start, expansion_end=end, apply_overrides=False,
         )
     except Exception as e:
         return jsonify({"error": f"Could not build preview: {e}"}), 200
     events = ical_events_to_dicts(ical, start=start, end=end, limit=300)
-    return jsonify({"events": events, "days": days, "view": view_slug})
+    overrides = db.get_event_overrides_for(session["user_slug"], calendar_slug, view_slug)
+    for e in events:
+        o = pick_override(overrides, e["uid"], e["start"])
+        e["override"] = _override_json(o) if o else None
+    return jsonify({"events": events, "days": days, "view": view_slug,
+                    "overrides": [_override_json(o) for o in overrides]})
+
+
+def _drop_cached_feeds(calendar_slug):
+    """Overrides take effect in the feed immediately, not after the cache TTL."""
+    from app.functions import cache as feed_cache
+    feed_cache.invalidate_prefix(f"feed:{session['user_slug']}:{calendar_slug}:")
+
+
+def _override_json(o):
+    return {"id": o["id"], "action": o["action"], "new_title": o["new_title"], "label": o["label"],
+            "uid": o["event_uid"], "start": o["instance_start"], "scope": "this" if o["instance_start"] else "all",
+            "view": o["view_slug"]}
+
+
+@ui_bp.route("/calendars/<calendar_slug>/overrides", methods=["POST"])
+@login_required
+def event_override_create(calendar_slug):
+    """Hide or rename one event (or a whole series) without writing a rule."""
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    f = request.form
+    uid = (f.get("uid") or "").strip()
+    action = f.get("action")
+    scope = f.get("scope", "this")
+    view = (f.get("view") or "").strip() or None
+    title = (f.get("title") or "").strip()
+    label = (f.get("label") or "").strip()
+    start = (f.get("start") or "").strip()
+
+    def bad(msg):
+        return jsonify({"ok": False, "error": msg}), 400
+
+    if not uid or len(uid) > 500:
+        return bad("This event has no stable id, so it can't be overridden.")
+    if action not in ("hide", "rename"):
+        return bad("Unknown action.")
+    if action == "rename" and not (1 <= len(title) <= 200):
+        return bad("Enter a title (up to 200 characters).")
+    if scope not in ("this", "all"):
+        return bad("Unknown scope.")
+    instance = None
+    if scope == "this":
+        try:
+            instance = datetime.datetime.fromisoformat(start).replace(tzinfo=None).isoformat()
+        except ValueError:
+            return bad("Missing or invalid event time.")
+    if view and view != "default" and not db.get_view_by_slug(session["user_slug"], calendar_slug, view):
+        return bad("That view doesn't exist.")
+    try:
+        new_id = db.add_event_override(cal["id"], view, uid, instance, action,
+                                       title if action == "rename" else None, label)
+    except ValueError:
+        return bad(f"Too many manual changes on this calendar (limit {db.MAX_OVERRIDES_PER_CALENDAR}).")
+    audit("override.created", f"calendar:{calendar_slug}", f"{action}: {label[:80]}" if label else action)
+    _drop_cached_feeds(calendar_slug)
+    return jsonify({"ok": True, "id": new_id})
+
+
+@ui_bp.route("/calendars/<calendar_slug>/overrides/<int:override_id>/delete", methods=["POST"])
+@login_required
+def event_override_delete(calendar_slug, override_id):
+    cal = _owned_calendar_or_404(calendar_slug)
+    current_app.db.delete_event_override(cal["id"], override_id)
+    audit("override.removed", f"calendar:{calendar_slug}", f"override id {override_id}")
+    _drop_cached_feeds(calendar_slug)
+    return jsonify({"ok": True})
 
 
 # ------------------------------------------------------------------
@@ -951,6 +1118,7 @@ def profile():
             display_name = request.form.get("display_name", "").strip() or user["username"]
             email = request.form.get("email", "").strip()
             db.update_user_profile(session["user_id"], display_name, email)
+            audit("profile.updated")
             flash("Profile updated.", "success")
 
         elif action == "password":
@@ -966,6 +1134,7 @@ def profile():
                 flash("Passwords do not match.", "error")
             else:
                 db.update_user_password(session["user_id"], generate_password_hash(new_pw))
+                audit("password.changed")
                 flash("Password changed.", "success")
 
         elif action == "totp_start":
@@ -987,6 +1156,7 @@ def profile():
                 db.enable_totp(session["user_id"], secret, step, hashed)
                 session.pop("totp_setup_secret", None)
                 session["totp_new_recovery"] = codes
+                audit("2fa.enabled")
                 flash("Two-factor authentication is on.", "success")
 
         elif action == "totp_disable":
@@ -1001,6 +1171,7 @@ def profile():
                 flash("That code isn't valid.", "error")
             else:
                 db.disable_totp(session["user_id"])
+                audit("2fa.disabled")
                 flash("Two-factor authentication is off.", "success")
 
         return redirect(url_for("ui.profile"))
@@ -1013,6 +1184,7 @@ def profile():
         totp_remaining=totp_lib.recovery_codes_remaining(state["totp_recovery"]),
         setup_secret=totp_lib.format_secret(setup_secret) if setup_secret else None,
         setup_uri=totp_lib.provisioning_uri(setup_secret, user["username"]) if setup_secret else None,
+        setup_qr=totp_lib.provisioning_qr_svg(totp_lib.provisioning_uri(setup_secret, user["username"])) if setup_secret else None,
         new_recovery=session.pop("totp_new_recovery", None),
     )
 
@@ -1036,6 +1208,7 @@ def admin_user_reset_2fa(user_id):
     if not target:
         abort(404)
     db.disable_totp(user_id)
+    audit("admin.2fa_reset", f"user:{target['username']}")
     flash(f"Two-factor authentication reset for {target['username']}.", "success")
     return redirect(url_for("ui.admin_users"))
 
@@ -1060,6 +1233,7 @@ def admin_user_new():
         except Exception:
             flash("Username or email already exists.", "error")
             return render_template("admin_user_new.html", nav_calendars=_nav_calendars())
+        audit("admin.user_created", f"user:{username}")
         flash(f"User '{username}' created.", "success")
         return redirect(url_for("ui.admin_users"))
     return render_template("admin_user_new.html", nav_calendars=_nav_calendars())
@@ -1072,6 +1246,7 @@ def admin_user_delete(user_id):
         flash("You cannot delete your own account.", "error")
         return redirect(url_for("ui.admin_users"))
     current_app.db.delete_user(user_id)
+    audit("admin.user_deleted", f"user id {user_id}")
     flash("User deleted.", "success")
     return redirect(url_for("ui.admin_users"))
 
@@ -1092,6 +1267,7 @@ def admin_user_reset_password(user_id):
             flash("Passwords do not match.", "error")
         else:
             db.update_user_password(user_id, generate_password_hash(new_pw))
+            audit("admin.password_reset", f"user:{user['username']}")
             flash(f"Password reset for {user['username']}.", "success")
             return redirect(url_for("ui.admin_users"))
     return render_template("admin_user_reset_password.html", user=user, nav_calendars=_nav_calendars())

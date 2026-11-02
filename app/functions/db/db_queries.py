@@ -55,6 +55,44 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "event_override_insert": """
+        INSERT INTO event_overrides (calendar_id, view_slug, event_uid, instance_start, action, new_title, label, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    "event_override_clear_target": """
+        DELETE FROM event_overrides
+        WHERE calendar_id = ? AND event_uid = ? AND IFNULL(view_slug, '') = ? AND IFNULL(instance_start, '') = ?
+    """,
+    "event_overrides_all": "SELECT * FROM event_overrides WHERE calendar_id = ? ORDER BY id",
+    "event_overrides_for_view": """
+        SELECT o.* FROM event_overrides o
+        JOIN calendars c ON o.calendar_id = c.id
+        JOIN users u ON c.user_id = u.id
+        WHERE u.slug = ? AND c.slug = ? AND (o.view_slug IS NULL OR o.view_slug = ?)
+    """,
+    "event_override_delete": "DELETE FROM event_overrides WHERE id = ? AND calendar_id = ?",
+    "event_overrides_delete_for_calendar": "DELETE FROM event_overrides WHERE calendar_id = ?",
+    "audit_insert": """
+        INSERT INTO audit_log (ts, user_id, username, action, target, detail, ip)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """,
+    "audit_prune": "DELETE FROM audit_log WHERE id <= (SELECT MAX(id) FROM audit_log) - ?",
+    "feed_tokens_delete_for_calendar": "DELETE FROM feed_tokens WHERE calendar_id = ?",
+    "feed_token_insert": """
+        INSERT INTO feed_tokens (calendar_id, view_slug, label, token_hash, token_prefix, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """,
+    "feed_tokens_for_calendar": """
+        SELECT id, view_slug, label, token_prefix, created_at, last_used_at, use_count
+        FROM feed_tokens WHERE calendar_id = ? ORDER BY id
+    """,
+    "feed_token_revoke": "DELETE FROM feed_tokens WHERE id = ? AND calendar_id = ?",
+    "feed_token_lookup": """
+        SELECT id FROM feed_tokens
+        WHERE calendar_id = ? AND token_hash = ? AND (view_slug IS NULL OR view_slug = ?)
+    """,
+    "feed_token_touch": "UPDATE feed_tokens SET last_used_at = ?, use_count = use_count + 1 WHERE id = ?",
+    "calendar_set_feed_token_required": "UPDATE calendars SET feed_token_required = ? WHERE id = ?",
     "calendar_record_feed_hit": """
         UPDATE calendars SET feed_hits = feed_hits + 1, last_feed_at = ? WHERE id = ?
     """,

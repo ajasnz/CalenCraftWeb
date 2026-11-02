@@ -834,3 +834,12 @@ h1, h2, h3 { font-weight: 800; letter-spacing: -.01em; }
 .btn, .tab.active, .form-card-title, .page-header h2 { font-weight: 700; }
 .totp-secret { display: inline-block; padding: .5rem .75rem; font-size: 1rem; letter-spacing: .08em; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; word-break: break-all; }
 .recovery-codes { margin: .6rem 0 1rem; padding: .75rem 1rem; font: 600 .95rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; }
+
+.activity-table td { vertical-align: top; font-size: .84rem; overflow-wrap: anywhere; }
+.activity-table td:first-child { white-space: nowrap; color: var(--muted); }
+.act { font-weight: 700; }
+.act-login, .act-logout { color: var(--primary); }
+.act-2fa, .act-password, .act-token, .act-admin { color: var(--warning); }
+.activity-pager { display: flex; gap: .5rem; margin-top: 1rem; }
+.totp-qr { display: inline-block; padding: .5rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); line-height: 0; }
+.totp-qr svg { width: 200px; height: 200px; display: block; }

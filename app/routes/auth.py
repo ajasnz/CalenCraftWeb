@@ -4,6 +4,7 @@ import logging
 from flask import Blueprint, render_template, request, redirect, url_for, session, current_app, flash
 from werkzeug.security import check_password_hash
 from app.functions import totp
+from app.functions.audit import audit
 
 auth_bp = Blueprint("auth", __name__)
 log = logging.getLogger(__name__)
@@ -54,6 +55,7 @@ def _finish_login(user, ip):
     session["is_admin"]  = bool(user["is_admin"])
     _clear_failures(ip)
     log.info("Login: %s from %s", user["username"], ip)
+    audit("login.success", user_id=user["id"], username=user["slug"])
 
 
 @auth_bp.route("/login/2fa", methods=["GET", "POST"])
@@ -85,12 +87,15 @@ def login_2fa():
                 if remaining is not None:
                     db.update_totp_state(user["id"], state["totp_last_step"], remaining)
                     log.warning("Recovery code used for %s", user["username"])
+                    audit("login.recovery_code_used", user_id=user["id"], username=user["slug"],
+                          detail=f"{totp.recovery_codes_remaining(remaining)} left")
                     ok = True
         if ok:
             _finish_login(user, ip)
             return redirect(url_for("ui.dashboard"))
         _record_failure(ip)
         log.warning("Failed 2FA attempt for uid %s from %s", pending["uid"], ip)
+        audit("login.2fa_failed", user_id=pending["uid"], username=user["slug"] if user else None)
         flash("Invalid code.", "error")
 
     return render_template("login_2fa.html")
@@ -127,6 +132,9 @@ def login():
 
         _record_failure(ip)
         log.warning("Failed login attempt for %r from %s", username, ip)
+        # Only name the account when it exists: what was typed into the box could be a password.
+        audit("login.failed", user_id=user["id"] if user else None, username=user["slug"] if user else None,
+              detail="wrong password" if user else "unknown username")
         flash("Invalid username or password.", "error")
 
     return render_template("login.html")
@@ -134,5 +142,7 @@ def login():
 
 @auth_bp.route("/logout")
 def logout():
+    if session.get("user_id"):
+        audit("logout")
     session.clear()
     return redirect(url_for("auth.login"))
