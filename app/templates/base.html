@@ -8,18 +8,17 @@
   <script>try{var t=localStorage.getItem('cc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
-  <meta name="theme-color" content="#0891b2">
+  <meta name="theme-color" content="#0c2340">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="CalenCraft">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <style>body { font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }</style>
+  <style>body { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }</style>
 </head>
 <body class="{% if session.user_id %}has-nav{% endif %}">
-<a class="skip-link" href="#main">Skip to content</a>
 
 {% if session.user_id %}
 {% set _username = session.get('user_slug', '') %}

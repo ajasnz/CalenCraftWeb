@@ -251,8 +251,9 @@ class CalendarDB:
     def delete_calendar(self, calendar_id):
         """Delete a calendar and everything that belongs to it, all-or-nothing.
 
-        Foreign keys are enforced, so children must go first (same fix as the hotfix on main).
-        Sources left linked to no calendar at all are removed too.
+        Foreign keys are enforced, so children must go first; deleting just the calendar row
+        failed for any calendar that had a source, view, rule or filter. Sources left linked to
+        no calendar at all are removed too, so they don't pile up as orphans.
         """
         try:
             source_ids = [r["source_id"] for r in self._fetchall(
