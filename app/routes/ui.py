@@ -7,7 +7,7 @@ from flask import (
     session, current_app, flash, abort, jsonify,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.classes.calendar import CalendarBuilder, ical_events_to_dicts
+from app.classes.calendar import CalendarBuilder, ical_events_to_dicts, pick_override
 from app.functions import totp as totp_lib
 from app.functions.audit import audit
 
@@ -874,14 +874,86 @@ def calendar_upcoming(calendar_slug):
     builder = CalendarBuilder()
     builder.db = db
     try:
+        # Overrides are shown, not applied, so hidden events stay visible here with an undo.
         ical = builder.build(
             user_slug=session["user_slug"], calendar_slug=calendar_slug, view_slug=view_slug,
-            expansion_start=start, expansion_end=end,
+            expansion_start=start, expansion_end=end, apply_overrides=False,
         )
     except Exception as e:
         return jsonify({"error": f"Could not build preview: {e}"}), 200
     events = ical_events_to_dicts(ical, start=start, end=end, limit=300)
-    return jsonify({"events": events, "days": days, "view": view_slug})
+    overrides = db.get_event_overrides_for(session["user_slug"], calendar_slug, view_slug)
+    for e in events:
+        o = pick_override(overrides, e["uid"], e["start"])
+        e["override"] = _override_json(o) if o else None
+    return jsonify({"events": events, "days": days, "view": view_slug,
+                    "overrides": [_override_json(o) for o in overrides]})
+
+
+def _drop_cached_feeds(calendar_slug):
+    """Overrides take effect in the feed immediately, not after the cache TTL."""
+    from app.functions import cache as feed_cache
+    feed_cache.invalidate_prefix(f"feed:{session['user_slug']}:{calendar_slug}:")
+
+
+def _override_json(o):
+    return {"id": o["id"], "action": o["action"], "new_title": o["new_title"], "label": o["label"],
+            "uid": o["event_uid"], "start": o["instance_start"], "scope": "this" if o["instance_start"] else "all",
+            "view": o["view_slug"]}
+
+
+@ui_bp.route("/calendars/<calendar_slug>/overrides", methods=["POST"])
+@login_required
+def event_override_create(calendar_slug):
+    """Hide or rename one event (or a whole series) without writing a rule."""
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    f = request.form
+    uid = (f.get("uid") or "").strip()
+    action = f.get("action")
+    scope = f.get("scope", "this")
+    view = (f.get("view") or "").strip() or None
+    title = (f.get("title") or "").strip()
+    label = (f.get("label") or "").strip()
+    start = (f.get("start") or "").strip()
+
+    def bad(msg):
+        return jsonify({"ok": False, "error": msg}), 400
+
+    if not uid or len(uid) > 500:
+        return bad("This event has no stable id, so it can't be overridden.")
+    if action not in ("hide", "rename"):
+        return bad("Unknown action.")
+    if action == "rename" and not (1 <= len(title) <= 200):
+        return bad("Enter a title (up to 200 characters).")
+    if scope not in ("this", "all"):
+        return bad("Unknown scope.")
+    instance = None
+    if scope == "this":
+        try:
+            instance = datetime.datetime.fromisoformat(start).replace(tzinfo=None).isoformat()
+        except ValueError:
+            return bad("Missing or invalid event time.")
+    if view and view != "default" and not db.get_view_by_slug(session["user_slug"], calendar_slug, view):
+        return bad("That view doesn't exist.")
+    try:
+        new_id = db.add_event_override(cal["id"], view, uid, instance, action,
+                                       title if action == "rename" else None, label)
+    except ValueError:
+        return bad(f"Too many manual changes on this calendar (limit {db.MAX_OVERRIDES_PER_CALENDAR}).")
+    audit("override.created", f"calendar:{calendar_slug}", f"{action}: {label[:80]}" if label else action)
+    _drop_cached_feeds(calendar_slug)
+    return jsonify({"ok": True, "id": new_id})
+
+
+@ui_bp.route("/calendars/<calendar_slug>/overrides/<int:override_id>/delete", methods=["POST"])
+@login_required
+def event_override_delete(calendar_slug, override_id):
+    cal = _owned_calendar_or_404(calendar_slug)
+    current_app.db.delete_event_override(cal["id"], override_id)
+    audit("override.removed", f"calendar:{calendar_slug}", f"override id {override_id}")
+    _drop_cached_feeds(calendar_slug)
+    return jsonify({"ok": True})
 
 
 # ------------------------------------------------------------------

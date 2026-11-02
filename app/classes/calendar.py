@@ -6,6 +6,39 @@ from icalendar import Calendar, Event
 log = logging.getLogger(__name__)
 
 
+def event_start_key(component):
+    """Naive ISO start of a VEVENT (tz dropped), the identity of one occurrence.
+
+    Must equal the "start" that `ical_events_to_dicts` reports (a test guards that).
+    """
+    dtstart = component.get("DTSTART")
+    if not dtstart:
+        return None
+    raw = dtstart.dt
+    dt = raw if isinstance(raw, datetime.datetime) else datetime.datetime.combine(raw, datetime.time.min)
+    if dt.tzinfo is not None:
+        dt = dt.replace(tzinfo=None)
+    return dt.isoformat()
+
+
+def pick_override(overrides, uid, start_key):
+    """The most specific override for one occurrence, or None.
+
+    A rule for this occurrence beats one for the whole series, and a view-specific rule beats
+    an all-views one, so "hide the series everywhere, but keep this one" behaves intuitively.
+    """
+    best, best_rank = None, -1
+    for o in overrides:
+        if o["event_uid"] != uid:
+            continue
+        if o["instance_start"] is not None and o["instance_start"] != start_key:
+            continue
+        rank = (2 if o["instance_start"] is not None else 0) + (1 if o["view_slug"] is not None else 0)
+        if rank > best_rank:
+            best, best_rank = o, rank
+    return best
+
+
 class CalendarBuilder:
     def __init__(self):
         """
@@ -236,6 +269,26 @@ class CalendarBuilder:
                     del event[target_property]
         return event
 
+    def _apply_event_overrides(self, occurrences):
+        """Drop or rename individual occurrences according to the saved manual overrides."""
+        getter = getattr(self.db, "get_event_overrides_for", None)
+        overrides = getter(self.user_slug, self.calendar_slug, self.view_slug) if getter else []
+        if not overrides:
+            return occurrences
+        kept = []
+        for event in occurrences:
+            o = pick_override(overrides, str(event.get("UID", "")), event_start_key(event))
+            if o is None:
+                kept.append(event)
+            elif o["action"] == "hide":
+                continue
+            elif o["action"] == "rename" and o["new_title"]:
+                event["SUMMARY"] = o["new_title"]
+                kept.append(event)
+            else:
+                kept.append(event)
+        return kept
+
     def build(
         self,
         user_slug,
@@ -245,9 +298,13 @@ class CalendarBuilder:
         expansion_end=None,
         extra_rule=None,
         extra_filter=None,
+        apply_overrides=True,
     ):
         """
         Build and return an aggregated iCalendar for the given identifiers.
+
+        `apply_overrides=False` skips per-event hide/rename (the Preview tab uses this so
+        hidden events stay visible there, marked, with an undo).
 
         - Stores `user_slug`, `calendar_slug`, `view_slug` and resets internal
             `rules` and `filters` containers.
@@ -411,6 +468,9 @@ class CalendarBuilder:
             expansion_start=expansion_start,
             expansion_end=expansion_end,
         )
+
+        if apply_overrides:
+            occurrences = self._apply_event_overrides(occurrences)
 
         final_calendar = Calendar()
         final_calendar.add("prodid", "-//CalenCraft//EN")

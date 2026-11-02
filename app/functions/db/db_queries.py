@@ -55,6 +55,23 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "event_override_insert": """
+        INSERT INTO event_overrides (calendar_id, view_slug, event_uid, instance_start, action, new_title, label, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    "event_override_clear_target": """
+        DELETE FROM event_overrides
+        WHERE calendar_id = ? AND event_uid = ? AND IFNULL(view_slug, '') = ? AND IFNULL(instance_start, '') = ?
+    """,
+    "event_overrides_all": "SELECT * FROM event_overrides WHERE calendar_id = ? ORDER BY id",
+    "event_overrides_for_view": """
+        SELECT o.* FROM event_overrides o
+        JOIN calendars c ON o.calendar_id = c.id
+        JOIN users u ON c.user_id = u.id
+        WHERE u.slug = ? AND c.slug = ? AND (o.view_slug IS NULL OR o.view_slug = ?)
+    """,
+    "event_override_delete": "DELETE FROM event_overrides WHERE id = ? AND calendar_id = ?",
+    "event_overrides_delete_for_calendar": "DELETE FROM event_overrides WHERE calendar_id = ?",
     "audit_insert": """
         INSERT INTO audit_log (ts, user_id, username, action, target, detail, ip)
         VALUES (?, ?, ?, ?, ?, ?, ?)

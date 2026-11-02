@@ -258,6 +258,7 @@ class CalendarDB:
             source_ids = [r["source_id"] for r in self._fetchall(
                 "SELECT source_id FROM calendar_sources WHERE calendar_id = ?", (calendar_id,))]
             self._execute(self._named("feed_tokens_delete_for_calendar"), (calendar_id,), commit=False)
+            self._execute(self._named("event_overrides_delete_for_calendar"), (calendar_id,), commit=False)
             for table in ("rules", "filters", "views", "calendar_sources"):   # fixed names, never user input
                 self._execute("DELETE FROM %s WHERE calendar_id = ?" % table, (calendar_id,), commit=False)
             for sid in source_ids:
@@ -269,6 +270,41 @@ class CalendarDB:
         except Exception:
             self.conn.rollback()
             raise
+
+    # ------------------------------------------------------------------
+    # Event overrides
+    # ------------------------------------------------------------------
+
+    MAX_OVERRIDES_PER_CALENDAR = 500
+
+    def add_event_override(self, calendar_id, view_slug, uid, instance_start, action, new_title, label):
+        """Create (or replace) the override for exactly this target. Returns its id."""
+        import datetime
+        try:
+            self._execute(self._named("event_override_clear_target"),
+                          (calendar_id, uid, view_slug or "", instance_start or ""), commit=False)
+            count = self._fetchone("SELECT COUNT(*) AS n FROM event_overrides WHERE calendar_id = ?",
+                                   (calendar_id,))["n"]
+            if count >= self.MAX_OVERRIDES_PER_CALENDAR:
+                raise ValueError("too many overrides")
+            new_id = self._execute(self._named("event_override_insert"), (
+                calendar_id, view_slug or None, uid, instance_start or None, action, new_title or None,
+                (label or "")[:200], datetime.datetime.utcnow().isoformat(timespec="seconds")), commit=False)
+            self.conn.commit()
+            return new_id
+        except Exception:
+            self.conn.rollback()
+            raise
+
+    def list_event_overrides(self, calendar_id):
+        return self._fetchall(self._named("event_overrides_all"), (calendar_id,))
+
+    def get_event_overrides_for(self, user_slug, calendar_slug, view_slug):
+        """Overrides that apply to this view: all-views ones plus ones for this exact view."""
+        return self._fetchall(self._named("event_overrides_for_view"), (user_slug, calendar_slug, view_slug))
+
+    def delete_event_override(self, calendar_id, override_id):
+        self._execute(self._named("event_override_delete"), (override_id, calendar_id))
 
     # ------------------------------------------------------------------
     # Audit log
@@ -378,6 +414,8 @@ class CalendarDB:
                         "view_id": view_map.get(r["view_id"]),
                         "source_id": source_map.get(r["source_id"]),
                     })
+            for o in self._fetchall("SELECT * FROM event_overrides WHERE calendar_id = ?", (calendar_id,)):
+                copy_row("event_overrides", o, {"id"}, {"calendar_id": new_id})
             self.conn.commit()
         except Exception:
             self.conn.rollback()
