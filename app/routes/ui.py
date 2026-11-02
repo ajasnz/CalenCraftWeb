@@ -890,7 +890,8 @@ def profile():
             current_pw  = request.form.get("current_password", "")
             new_pw      = request.form.get("new_password", "")
             confirm_pw  = request.form.get("confirm_password", "")
-            if not check_password_hash(user["password"], current_pw):
+            # get_user_by_id deliberately omits the hash, so load it explicitly for this check
+            if not check_password_hash(db.get_user_by_username(user["username"])["password"], current_pw):
                 flash("Current password is incorrect.", "error")
             elif len(new_pw) < 8:
                 flash("New password must be at least 8 characters.", "error")
