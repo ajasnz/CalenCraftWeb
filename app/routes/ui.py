@@ -1116,6 +1116,7 @@ def profile():
         totp_remaining=totp_lib.recovery_codes_remaining(state["totp_recovery"]),
         setup_secret=totp_lib.format_secret(setup_secret) if setup_secret else None,
         setup_uri=totp_lib.provisioning_uri(setup_secret, user["username"]) if setup_secret else None,
+        setup_qr=totp_lib.provisioning_qr_svg(totp_lib.provisioning_uri(setup_secret, user["username"])) if setup_secret else None,
         new_recovery=session.pop("totp_new_recovery", None),
     )
 

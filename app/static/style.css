@@ -849,3 +849,5 @@ main:focus { outline: none; }
 .act-login, .act-logout { color: var(--primary); }
 .act-2fa, .act-password, .act-token, .act-admin { color: var(--warning); }
 .activity-pager { display: flex; gap: .5rem; margin-top: 1rem; }
+.totp-qr { display: inline-block; padding: .5rem; background: #fff; border: 1px solid var(--border); border-radius: var(--radius-sm); line-height: 0; }
+.totp-qr svg { width: 200px; height: 200px; display: block; }
