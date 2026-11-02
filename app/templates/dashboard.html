@@ -46,7 +46,12 @@
       <div class="cal-card-activity">
         {% if cal.last_feed_at %}Feed fetched {{ cal.last_feed_at|timeago }} · {{ cal.feed_hits }} total{% else %}Feed not fetched yet{% endif %}
       </div>
-      {% if cal.share_ics and cal.default_view_enabled %}
+      {% if cal.share_ics and cal.default_view_enabled and cal.feed_token_required %}
+      <div class="cal-card-url">
+        <code>Token required to subscribe</code>
+        <a class="btn btn-sm btn-ghost" href="{{ url_for('ui.calendar_detail', calendar_slug=cal.slug, tab='sharing') }}#feed-access">Manage</a>
+      </div>
+      {% elif cal.share_ics and cal.default_view_enabled %}
       <div class="cal-card-url">
         <code>/feed/{{ session.get('user_slug','') }}/{{ cal.slug }}/default</code>
         <button type="button" class="btn btn-sm btn-ghost" data-copy="{{ request.host_url }}feed/{{ session.get('user_slug','') }}/{{ cal.slug }}/default">Copy</button>

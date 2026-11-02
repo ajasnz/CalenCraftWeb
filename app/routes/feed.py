@@ -33,6 +33,12 @@ def serve_feed(user_slug, calendar_slug, view_slug):
     if view_slug == "default" and not cfg.get("default_view_enabled", 1):
         abort(404)
 
+    # Secret-token gate. Checked before the cache so a cached feed is never served to someone
+    # without a valid token. 404 (not 401/403) so the URL doesn't confirm the calendar exists.
+    if cfg.get("feed_token_required") and not db.verify_feed_token(
+            cfg["id"], view_slug, request.args.get("token", "")):
+        abort(404)
+
     # Apply per-calendar expansion window when caller doesn't specify dates
     if expansion_start is None or expansion_end is None:
         days_behind = int(cfg.get("expansion_days_behind", 0))

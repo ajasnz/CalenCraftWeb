@@ -306,6 +306,7 @@ def calendar_detail(calendar_slug):
     return render_template(
         "calendar_detail.html",
         cal=cal, sources=sources, views=views, rules=rules, filters=filters,
+        feed_tokens=db.list_feed_tokens(cal["id"]), new_feed_token=session.pop("new_feed_token", None),
         views_by_id=views_by_id, sources_by_id=sources_by_id,
         sharing_links=sharing_links,
         active_tab=active_tab,
@@ -313,6 +314,61 @@ def calendar_detail(calendar_slug):
         user_slug=session["user_slug"],
         **_label_maps(),
     )
+
+
+def _owned_calendar_or_404(calendar_slug):
+    cal = current_app.db.get_calendar_by_slug(session["user_slug"], calendar_slug)
+    if not cal:
+        abort(404)
+    return cal
+
+
+def _to_access_tab(calendar_slug):
+    return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing") + "#feed-access")
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/create", methods=["POST"])
+@login_required
+def feed_token_create(calendar_slug):
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    scope = (request.form.get("view") or "").strip()
+    if scope and scope != "default" and not db.get_view_by_slug(session["user_slug"], calendar_slug, scope):
+        flash("That view doesn't exist.", "error")
+        return _to_access_tab(calendar_slug)
+    label = (request.form.get("label") or "").strip()[:80]
+    token = db.create_feed_token(cal["id"], scope or None, label)
+    url_view = scope or "default"
+    session["new_feed_token"] = {
+        "label": label or "Untitled token",
+        "url": f"{request.host_url}feed/{session['user_slug']}/{calendar_slug}/{url_view}?token={token}",
+    }
+    return _to_access_tab(calendar_slug)
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/<int:token_id>/revoke", methods=["POST"])
+@login_required
+def feed_token_revoke(calendar_slug, token_id):
+    cal = _owned_calendar_or_404(calendar_slug)
+    current_app.db.revoke_feed_token(cal["id"], token_id)
+    flash("Token revoked. Anyone using it will stop receiving the feed.", "success")
+    return _to_access_tab(calendar_slug)
+
+
+@ui_bp.route("/calendars/<calendar_slug>/tokens/require", methods=["POST"])
+@login_required
+def feed_token_require(calendar_slug):
+    db = current_app.db
+    cal = _owned_calendar_or_404(calendar_slug)
+    want = request.form.get("required") == "1"
+    if want and not db.list_feed_tokens(cal["id"]):
+        flash("Create a token first, otherwise every subscriber would be locked out.", "error")
+        return _to_access_tab(calendar_slug)
+    db.set_feed_token_required(cal["id"], want)
+    from app.functions import cache as feed_cache
+    feed_cache.invalidate_prefix(f"feed:{session['user_slug']}:{calendar_slug}:")
+    flash("Subscribers now need a token." if want else "Anyone with the feed URL can subscribe again.", "success")
+    return _to_access_tab(calendar_slug)
 
 
 @ui_bp.route("/calendars/<calendar_slug>/duplicate", methods=["POST"])
@@ -333,7 +389,7 @@ def calendar_duplicate(calendar_slug):
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
-_EXPORT_CAL_SKIP = {"id", "user_id", "state", "viewer_password", "feed_hits", "last_feed_at"}
+_EXPORT_CAL_SKIP = {"id", "user_id", "state", "viewer_password", "feed_hits", "last_feed_at", "feed_token_required"}
 _EXPORT_VIEW_SKIP = {"id", "calendar_id", "state", "viewer_password"}
 
 

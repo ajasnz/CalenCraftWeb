@@ -167,4 +167,26 @@ migrations = {
             ALTER TABLE users ADD COLUMN totp_recovery TEXT;
         """,
     },
+    6: {
+        "id": 6,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Feed access tokens",
+        "description": "Optional per-calendar requirement for a secret token on feed URLs, with revocable named tokens (stored hashed).",
+        "sql": """
+            ALTER TABLE calendars ADD COLUMN feed_token_required INTEGER NOT NULL DEFAULT 0;
+            CREATE TABLE IF NOT EXISTS feed_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                calendar_id INTEGER NOT NULL REFERENCES calendars(id),
+                view_slug TEXT,
+                label TEXT NOT NULL DEFAULT '',
+                token_hash TEXT NOT NULL UNIQUE,
+                token_prefix TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                last_used_at TEXT,
+                use_count INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_feed_tokens_calendar ON feed_tokens(calendar_id);
+        """,
+    },
 }
