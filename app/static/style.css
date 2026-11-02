@@ -825,6 +825,9 @@ main:focus { outline: none; }
 .dash-sort select { width: auto; padding: .5rem 2rem .5rem .75rem; font-size: .85rem; }
 @media (max-width: 600px) { .dash-tools { flex-wrap: wrap; } }
 
+.import-summary { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; padding: 0; }
+.import-sources { padding-left: 1.1rem; font-size: .82rem; overflow-wrap: anywhere; }
+.import-warning { margin-top: .9rem; padding: .65rem .9rem; font-size: .875rem; background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); border-radius: var(--radius-sm); }
 /* ── Brand type: Plus Jakarta Sans, 800 headings / 700 labels / 500 body ── */
 body { font-weight: 500; }
 h1, h2, h3 { font-weight: 800; letter-spacing: -.01em; }
