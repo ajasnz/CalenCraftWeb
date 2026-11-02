@@ -17,8 +17,9 @@
   {% endif %}
   <p class="tagline">This calendar is password protected.</p>
   <form method="post">
+    <input type="text" name="username" value="{{ cfg.slug }}" autocomplete="username" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
     <label for="pub_password">Password</label>
-    <input id="pub_password" name="pub_password" type="password" required autofocus>
+    <input id="pub_password" name="pub_password" type="password" autocomplete="current-password" autocapitalize="none" required autofocus>
     {% if error %}<p style="color:var(--danger);font-size:.85rem;margin-top:.5rem">Incorrect password.</p>{% endif %}
     <button type="submit" class="btn" style="width:100%;margin-top:1rem">View Calendar</button>
   </form>
