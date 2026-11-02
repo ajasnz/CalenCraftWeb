@@ -178,3 +178,16 @@ def test_migration_7_upgrades_a_v6_database(tmp_path, monkeypatch):
     assert d.list_audit() == []
     d.add_audit(1, "a", "x.y", None, None, None, 10)
     assert len(d.list_audit()) == 1 and d.get_user_by_username("a")["slug"] == "a"      # existing data intact
+
+
+def test_importing_a_calendar_is_audited_without_leaking_source_urls(app):
+    import json
+    c = login(app)
+    payload = {"calencraft_export": 1, "calendar": {"title": "Restored"},
+               "sources": [{"name": "Team", "url": SOURCE_URL, "enabled": True}],
+               "views": [], "filters": [], "rules": []}
+    r = c.post("/calendars/import/confirm", data={"payload": json.dumps(payload)})
+    assert r.status_code == 302
+    imported = [x for x in rows(app) if x["action"] == "calendar.imported"]
+    assert len(imported) == 1 and imported[0]["target"] == "calendar:restored" and imported[0]["detail"] == "Restored"
+    assert "SECRETKEY123" not in str(rows(app))
