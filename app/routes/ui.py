@@ -513,6 +513,10 @@ def build_calendar_export(db, user_slug, cal):
         "views": [{k: v for k, v in vw.items() if k not in _EXPORT_VIEW_SKIP} for vw in views],
         "filters": filters,
         "rules": rules,
+        "event_overrides": [
+            {"view": o["view_slug"], "event_uid": o["event_uid"], "instance_start": o["instance_start"],
+             "action": o["action"], "new_title": o["new_title"], "label": o["label"]}
+            for o in db.list_event_overrides(cal["id"])],
     }
 
 

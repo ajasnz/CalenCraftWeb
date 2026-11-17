@@ -12,6 +12,7 @@
     <li><strong>{{ clean.views|length }}</strong> view{{ '' if clean.views|length == 1 else 's' }}{% if clean.views %}: {{ clean.views|map(attribute='slug')|join(', ') }}{% endif %}</li>
     <li><strong>{{ clean.filters|length }}</strong> filter{{ '' if clean.filters|length == 1 else 's' }}</li>
     <li><strong>{{ clean.rules|length }}</strong> rule{{ '' if clean.rules|length == 1 else 's' }}</li>
+    {% if clean.event_overrides %}<li><strong>{{ clean.event_overrides|length }}</strong> hidden/renamed event{{ '' if clean.event_overrides|length == 1 else 's' }}</li>{% endif %}
   </ul>
 
   {% if clean.sources %}

@@ -6,7 +6,7 @@ here from whitelisted, type-checked, length-capped values. Pure functions, no I/
 import re
 
 MAX_BYTES = 400_000          # stays under Werkzeug's default 500 kB form-field cap (preview round-trip)
-LIMITS = {"sources": 50, "views": 50, "filters": 500, "rules": 500}
+LIMITS = {"sources": 50, "views": 50, "filters": 500, "rules": 500, "event_overrides": 500}
 MAX_ERRORS = 20
 
 _PROP_RE = re.compile(r"^[A-Za-z0-9*_-]{1,100}$")
@@ -205,10 +205,45 @@ def validate_config(data, *, url_validator, slugify, sanitize_color,
                       "target_property": tprop, "action": raction,
                       "target_value": _str(r.get("target_value"), 2000, errors, f"{where}.target_value")})
 
+    # event overrides (hide/rename single events) ───────────────────────────
+    import datetime
+    overrides = {}
+    for i, o in enumerate(_list(data, "event_overrides", errors)):
+        where = f"event_overrides[{i}]"
+        uid = _str(o.get("event_uid"), 500, errors, f"{where}.event_uid", required=True)
+        action = o.get("action")
+        if action not in ("hide", "rename"):
+            errors.add(f"{where}.action: must be hide or rename")
+        new_title = _str(o.get("new_title"), 200, errors, f"{where}.new_title") if action == "rename" else ""
+        if action == "rename" and not new_title.strip():
+            errors.add(f"{where}.new_title: a rename needs a title")
+        instance = o.get("instance_start")
+        if instance not in (None, ""):
+            try:
+                instance = datetime.datetime.fromisoformat(str(instance)).replace(tzinfo=None).isoformat()
+            except ValueError:
+                errors.add(f"{where}.instance_start: not a valid date/time")
+                instance = None
+        else:
+            instance = None
+        view = o.get("view")
+        if view in ("", None):
+            view = None
+        elif not isinstance(view, str) or (view != "default" and slugify(view) not in view_slugs):
+            errors.add(f"{where}.view: refers to unknown view")
+            view = None
+        else:
+            view = view if view == "default" else slugify(view)
+        # the same target twice: the later entry wins, like re-saving it in the app
+        overrides[(uid, instance, view)] = {
+            "view": view, "event_uid": uid, "instance_start": instance, "action": action,
+            "new_title": new_title if action == "rename" else None,
+            "label": _str(o.get("label"), 200, errors, f"{where}.label")}
+
     if clean_cal.get("share_viewer"):
         warnings.append("This calendar's public web viewer will be ON after import.")
 
     if errors:
         return None, warnings, list(errors)
     return {"title": title, "calendar": clean_cal, "sources": sources, "views": views,
-            "filters": filters, "rules": rules}, warnings, []
+            "filters": filters, "rules": rules, "event_overrides": list(overrides.values())}, warnings, []
