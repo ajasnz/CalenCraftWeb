@@ -263,4 +263,14 @@ migrations = {
             ALTER TABLE calendars ADD COLUMN viewer_footer TEXT;
         """,
     },
+    11: {
+        "id": 11,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Redact links, meeting IDs and passwords in shared event text",
+        "description": "Per-calendar switch that removes links, meeting IDs and passwords from event descriptions and locations in everything served to others.",
+        "sql": """
+            ALTER TABLE calendars ADD COLUMN redact_links INTEGER NOT NULL DEFAULT 0;
+        """,
+    },
 }

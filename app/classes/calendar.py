@@ -290,6 +290,14 @@ class CalendarBuilder:
                     del event[target_property]
         return event
 
+    def _apply_link_redaction(self, occurrences):
+        """Strip links, meeting IDs and passwords from descriptions/locations when redact_links is on."""
+        cal = self.db.get_calendar_by_slug(self.user_slug, self.calendar_slug)
+        if not cal or not cal.get("redact_links"):
+            return occurrences
+        from app.functions.link_redaction import redact_event
+        return [redact_event(event) for event in occurrences]
+
     def _apply_event_overrides(self, occurrences):
         """Drop or rename individual occurrences according to the saved manual overrides."""
         getter = getattr(self.db, "get_event_overrides_for", None)
@@ -492,6 +500,9 @@ class CalendarBuilder:
 
         if apply_overrides:
             occurrences = self._apply_event_overrides(occurrences)
+        # A privacy setting, not a presentation one, so it applies even when overrides are skipped
+        # (the Preview tab) and after every rule and override has had its say.
+        occurrences = self._apply_link_redaction(occurrences)
 
         final_calendar = Calendar()
         final_calendar.add("prodid", "-//CalenCraft//EN")

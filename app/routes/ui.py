@@ -465,6 +465,19 @@ def calendar_import_confirm():
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
+@ui_bp.route("/calendars/<calendar_slug>/privacy", methods=["POST"])
+@login_required
+def calendar_privacy(calendar_slug):
+    """Advanced tab → Privacy: redact links in everything shared from this calendar."""
+    cal = _owned_calendar_or_404(calendar_slug)
+    enabled = request.form.get("redact_links") == "1"
+    current_app.db.set_redact_links(cal["id"], enabled)
+    audit("calendar.privacy_changed", f"calendar:{calendar_slug}", "redaction of links, IDs and passwords " + ("on" if enabled else "off"))
+    _drop_cached_feeds(calendar_slug)               # takes effect immediately, not after the cache expires
+    flash("Links, meeting IDs and passwords will be redacted from shared events." if enabled else "Event text is no longer redacted.", "success")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="advanced") + "#privacy")
+
+
 @ui_bp.route("/calendars/<calendar_slug>/appearance", methods=["POST"])
 @login_required
 def calendar_appearance(calendar_slug):

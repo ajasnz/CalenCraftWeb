@@ -17,7 +17,7 @@ CAL_FIELDS = {
     "share_ics": BOOL, "share_viewer": BOOL, "viewer_title": TEXT, "viewer_description": TEXT,
     "viewer_color": COLOR, "viewer_free_busy_only": BOOL, "viewer_links": TEXT,
     "viewer_show_time": BOOL, "viewer_show_description": BOOL, "viewer_show_location": BOOL,
-    "viewer_hide_private": BOOL, "default_view_enabled": BOOL,
+    "viewer_hide_private": BOOL, "default_view_enabled": BOOL, "redact_links": BOOL,
     "expansion_days_ahead": DAYS, "expansion_days_behind": DAYS,
 }
 VIEW_FIELDS = {k: v for k, v in CAL_FIELDS.items()

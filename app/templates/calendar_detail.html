@@ -614,6 +614,20 @@
     </div>
   </form>
 
+  <div class="card" id="privacy" style="margin-bottom:1rem;padding:1.1rem 1.35rem">
+    <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.3rem">Privacy</h3>
+    <p class="hint" style="margin-bottom:.8rem">Online-meeting details in an event's description or location (Zoom, Teams, Google Meet and the like) are as good as a key to the meeting. Turn this on to remove links, meeting IDs and passwords from everything shared from this calendar.</p>
+    <form method="post" action="{{ url_for('ui.calendar_privacy', calendar_slug=cal.slug) }}">
+      <label class="checkbox-label"><input type="checkbox" name="redact_links" value="1" {% if cal.redact_links %}checked{% endif %}> Redact links, meeting IDs and passwords in event descriptions and locations</label>
+      <ul class="hint" style="margin:.6rem 0 .9rem 1.1rem">
+        <li>Links become “[link removed]”. A number after “ID” (e.g. <em>Meeting ID: 863 9599 6406</em>) becomes “[ID removed]”, and the word after <em>password</em>, <em>passcode</em>, <em>passphrase</em> or <em>PIN</em> becomes “[password removed]”</li>
+        <li>Applies to the public viewer, the embed, and every <code>.ics</code> feed. Calendar apps' own “Join” fields (conference, URL and attachment properties) are removed too</li>
+        <li>It works on wording, so unusual phrasing can slip through (e.g. a password with no label). The Preview tab shows exactly what subscribers will see, so check it</li>
+      </ul>
+      <button type="submit" class="btn btn-sm">Save</button>
+    </form>
+  </div>
+
   <div class="card" style="margin-bottom:1rem;padding:1.1rem 1.35rem">
     <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.3rem">Export configuration</h3>
     <p class="hint" style="margin-bottom:.8rem">Download a JSON backup of this calendar's sources, views, filters, rules and settings. Viewer passwords are not included.</p>

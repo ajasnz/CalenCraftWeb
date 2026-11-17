@@ -272,6 +272,9 @@ class CalendarDB:
             self.conn.rollback()
             raise
 
+    def set_redact_links(self, calendar_id, enabled):
+        self._execute(self._named("calendar_set_redact_links"), (1 if enabled else 0, calendar_id))
+
     def update_calendar_appearance(self, calendar_id, values):
         """Save validated viewer-appearance values (see viewer_appearance.clean_values)."""
         from app.functions import viewer_appearance as va

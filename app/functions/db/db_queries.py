@@ -55,6 +55,7 @@ queries = {
         INSERT INTO calendars (user_id, slug, title) VALUES (?, ?, ?)
     """,
     "calendar_delete": "DELETE FROM calendars WHERE id = ?",
+    "calendar_set_redact_links": "UPDATE calendars SET redact_links = ? WHERE id = ?",
     "event_override_insert": """
         INSERT INTO event_overrides (calendar_id, view_slug, event_uid, instance_start, action, new_title, label, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
