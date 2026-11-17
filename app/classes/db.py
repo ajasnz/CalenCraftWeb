@@ -520,7 +520,8 @@ class CalendarDB:
         ))
 
     def update_source_fetch_status(self, source_id, fetch_at, ok, error=None):
-        self._execute(self._named("source_update_fetch_status"), (fetch_at, ok, error, source_id))
+        self._execute(self._named("source_update_fetch_status"),
+                      (fetch_at, ok, error, ok, fetch_at, ok, fetch_at, source_id))
 
     def update_calendar_settings(self, calendar_id, expansion_days_ahead,
                                  expansion_days_behind, default_view_enabled):

@@ -105,8 +105,9 @@
             <span class="fetch-ok" title="Last fetched {{ s.last_fetch_at }} UTC">✓ OK</span>
             <div class="fetch-when">{{ s.last_fetch_at|timeago }}</div>
           {% else %}
-            <span class="fetch-err" title="{{ s.last_fetch_at }} UTC">✕ Failed</span>
-            <div class="fetch-when">{{ s.last_fetch_at|timeago }}</div>
+            <span class="fetch-err" title="Last checked {{ s.last_fetch_at }} UTC">✕ Failed</span>
+            <div class="fetch-when">Checked {{ s.last_fetch_at|timeago }}</div>
+            <div class="fetch-when">{% if s.failing_since %}Failing since {{ s.failing_since|timeago }}{% endif %}{% if s.last_success_at %}{{ ' · ' if s.failing_since }}last worked {{ s.last_success_at|timeago }}{% else %}{{ ' · ' if s.failing_since }}never worked{% endif %}</div>
             <div class="fetch-msg">{{ s.last_fetch_error or 'Unknown error' }}</div>
           {% endif %}
         {% else %}
