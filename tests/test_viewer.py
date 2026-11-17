@@ -141,6 +141,8 @@ class TestNoIndex:
 def test_list_view_groups_days_by_the_visitors_local_date():
     """The list view must not bucket by UTC date (that put morning events under the previous day in NZ)."""
     import os
-    html = open(os.path.join(os.path.dirname(__file__), "..", "app", "templates", "public_viewer.html"), encoding="utf-8").read()
-    assert "toISOString().slice(0, 10)" not in html
-    assert "function localDayKey" in html
+    base = os.path.join(os.path.dirname(__file__), "..", "app")
+    page = open(os.path.join(base, "templates", "public_viewer.html"), encoding="utf-8").read()
+    helpers = open(os.path.join(base, "static", "viewer-helpers.js"), encoding="utf-8").read()
+    assert "toISOString().slice(0, 10)" not in page and "toISOString().slice(0, 10)" not in helpers
+    assert "function localDayKey" in helpers and "localDayKey(" in page
