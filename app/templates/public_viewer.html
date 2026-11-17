@@ -7,8 +7,10 @@
   <meta name="robots" content="noindex, nofollow">
   <title>{{ cfg.viewer_title or cfg.title }}</title>
   <link rel="stylesheet" href="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='viewer-popup.css') }}">
   <script src="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js"></script>
   <script src="{{ url_for('static', filename='viewer-helpers.js') }}"></script>
+  <script src="{{ url_for('static', filename='viewer-popup.js') }}"></script>
   {# Sanitise accent colour — only allow #rrggbb to prevent CSS injection #}
   {% set _raw_color = cfg.viewer_color or '#00a9ff' %}
   {% set _accent = _raw_color if _raw_color.startswith('#') and _raw_color|length == 7 else '#00a9ff' %}
@@ -279,7 +281,7 @@ let eventsLoaded = false;
 const calendar = new tui.Calendar('#calendar', {
   defaultView: 'month',
   isReadOnly: true,
-  useDetailPopup: true,
+  useDetailPopup: false,          // our own read-only dialog replaces the library's popup (see viewer-popup.js)
   usageStatistics: false,
   week: { startDayOfWeek: OPTS.weekStart, hourStart: OPTS.hourStart, hourEnd: OPTS.hourEnd, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true, workweek: OPTS.hideWeekends },
   month: { startDayOfWeek: OPTS.weekStart, workweek: OPTS.hideWeekends },
@@ -297,12 +299,11 @@ const calendar = new tui.Calendar('#calendar', {
     timegridNowIndicatorLabel(p) {
       return fmtTime(p.time && p.time.toDate ? p.time.toDate() : new Date(p.time));
     },
-    // Read-only viewer: hide the popup's Edit/Delete actions
-    popupEdit() { return ''; },
-    popupDelete() { return ''; },
   },
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
+
+calendar.on('clickEvent', ({ event }) => CCPopup.open(CCPopup.fromTui(event, allEvents), fmtTime));
 
 if (OPTS.theme === 'dark' || (OPTS.theme === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
   calendar.setTheme({
