@@ -245,4 +245,22 @@ migrations = {
             UPDATE sources SET failing_since = last_fetch_at WHERE last_fetch_ok = 0;
         """,
     },
+    10: {
+        "id": 10,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Public viewer appearance settings",
+        "description": "Default view, week start, 12/24h clock, weekends, visible hours, theme, offered views and a footer note. Defaults match the previous behaviour.",
+        "sql": """
+            ALTER TABLE calendars ADD COLUMN viewer_default_view TEXT NOT NULL DEFAULT 'auto';
+            ALTER TABLE calendars ADD COLUMN viewer_week_start INTEGER NOT NULL DEFAULT 1;
+            ALTER TABLE calendars ADD COLUMN viewer_time_format TEXT NOT NULL DEFAULT '24h';
+            ALTER TABLE calendars ADD COLUMN viewer_hide_weekends INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE calendars ADD COLUMN viewer_hour_start INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE calendars ADD COLUMN viewer_hour_end INTEGER NOT NULL DEFAULT 24;
+            ALTER TABLE calendars ADD COLUMN viewer_theme TEXT NOT NULL DEFAULT 'auto';
+            ALTER TABLE calendars ADD COLUMN viewer_views TEXT NOT NULL DEFAULT 'month,week,day,list';
+            ALTER TABLE calendars ADD COLUMN viewer_footer TEXT;
+        """,
+    },
 }

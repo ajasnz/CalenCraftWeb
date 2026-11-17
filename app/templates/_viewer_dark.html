@@ -1,0 +1,25 @@
+{#- Dark theme for the public viewer and embed. Applied when the visitor's OS is dark (unless the owner
+    forced light) or when the owner forced dark, so one rule set serves both cases. -#}
+{% macro dark_css(accent) -%}
+{%- macro rules(root, p) -%}
+{{ root|safe }} {
+  --accent-soft: color-mix(in srgb, {{ accent }} 24%, #0c2340);
+  --bg: #0c2340; --surface: #133556; --surface-2: #0f2b49;
+  --border: #234a6d; --border-2: #2f5b82; --text: #f2f5f9; --muted: #a9bdd0;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4); --shadow-md: 0 8px 24px -8px rgba(0,0,0,.55);
+  color-scheme: dark;
+}
+{{ p|safe }}#cal-loading { background: rgba(19,53,86,.85); }
+{{ p|safe }}.toastui-calendar-weekday-event-dot ~ .toastui-calendar-weekday-event-title, {{ p|safe }}.toastui-calendar-weekday-event-dot + .toastui-calendar-weekday-event-title { color: var(--text) !important; }
+{{ p|safe }}.toastui-calendar-daygrid-cell { border-left-color: var(--border) !important; border-top-color: var(--border) !important; }
+{{ p|safe }}.toastui-calendar-popup-container, {{ p|safe }}.toastui-calendar-detail-container,
+{{ p|safe }}.toastui-calendar-see-more-container { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
+{{ p|safe }}.toastui-calendar-popup-section-item, {{ p|safe }}.toastui-calendar-popup-section { border-color: var(--border) !important; color: var(--text) !important; }
+{{ p|safe }}.toastui-calendar-detail-item, {{ p|safe }}.toastui-calendar-content, {{ p|safe }}.toastui-calendar-template-popupDetailTitle { color: var(--text) !important; }
+{{ p|safe }}.cal-error { background: #3a1c26; color: #f4a3a3; border-color: #6a2c3a; }
+{%- endmacro -%}
+@media (prefers-color-scheme: dark) {
+{{ rules(':root:not([data-theme="light"])', ':root:not([data-theme="light"]) ') }}
+}
+{{ rules(':root[data-theme="dark"]', ':root[data-theme="dark"] ') }}
+{%- endmacro %}

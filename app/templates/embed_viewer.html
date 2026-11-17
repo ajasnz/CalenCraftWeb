@@ -1,5 +1,6 @@
+{% from '_viewer_dark.html' import dark_css -%}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if opts.theme != 'auto' %} data-theme="{{ opts.theme }}"{% endif %}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,23 +24,8 @@
       --radius-sm: 8px;
     }
 
-    /* ── Dark mode (follows the visitor's OS setting) ─────────────────── */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --accent-soft: color-mix(in srgb, {{ _accent }} 24%, #0c2340);
-        --bg: #0c2340; --surface: #133556; --surface-2: #0f2b49;
-        --border: #234a6d; --border-2: #2f5b82; --text: #f2f5f9; --muted: #a9bdd0;
-        --shadow-sm: 0 1px 3px rgba(0,0,0,.4); --shadow-md: 0 8px 24px -8px rgba(0,0,0,.55);
-        color-scheme: dark;
-      }
-      #cal-loading { background: rgba(19,53,86,.85); }
-      .toastui-calendar-weekday-event-dot ~ .toastui-calendar-weekday-event-title, .toastui-calendar-weekday-event-dot + .toastui-calendar-weekday-event-title { color: var(--text) !important; }
-      .toastui-calendar-daygrid-cell { border-left-color: var(--border) !important; border-top-color: var(--border) !important; }
-      .toastui-calendar-popup-container, .toastui-calendar-detail-container,
-      .toastui-calendar-see-more-container { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-      .toastui-calendar-popup-section-item, .toastui-calendar-popup-section { border-color: var(--border) !important; color: var(--text) !important; }
-      .toastui-calendar-detail-item, .toastui-calendar-content, .toastui-calendar-template-popupDetailTitle { color: var(--text) !important; }
-    }
+    /* ── Dark mode: the visitor's OS, or forced by the owner ── */
+    {{ dark_css(_accent) }}
 
     html, body { height: 100%; }
     html { font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -105,22 +91,36 @@ const ACCENT = {{ _accent | tojson }};
 const DAYS_BEHIND = {{ (cfg.expansion_days_behind or 0) | int }};
 const DAYS_AHEAD  = {{ (cfg.expansion_days_ahead  or 180) | int }};
 
+const OPTS = {{ opts | tojson }};
+
 function pad(n) { return String(n).padStart(2, '0'); }
-function fmtTime(date) { return pad(date.getHours()) + ':' + pad(date.getMinutes()); }
+function fmtTime(date) {
+  const h = date.getHours(), m = date.getMinutes();
+  if (!OPTS.time12) return pad(h) + ':' + pad(m);
+  return (h % 12 || 12) + ':' + pad(m) + (h < 12 ? ' am' : ' pm');
+}
 
 const calendar = new tui.Calendar('#calendar', {
   defaultView: 'month',
   isReadOnly: true,
   useDetailPopup: true,
   usageStatistics: false,
-  week: { startDayOfWeek: 1, hourStart: 0, hourEnd: 24, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true },
-  month: { startDayOfWeek: 1, visibleWeeksCount: 6 },
+  week: { startDayOfWeek: OPTS.weekStart, hourStart: OPTS.hourStart, hourEnd: OPTS.hourEnd, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true, workweek: OPTS.hideWeekends },
+  month: { startDayOfWeek: OPTS.weekStart, visibleWeeksCount: 6, workweek: OPTS.hideWeekends },
   template: {
     time(event) {
       const showTime = event.raw && event.raw.showTime;
       return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title);
     },
     allday(event) { return event.title; },
+    // keep the time-grid labels in the owner's chosen clock format (tui defaults to "7 am")
+    timegridDisplayPrimaryTime(p) {
+      const d = p.time && p.time.toDate ? p.time.toDate() : new Date(p.time);
+      return OPTS.time12 ? ((d.getHours() % 12 || 12) + (d.getHours() < 12 ? ' am' : ' pm')) : pad(d.getHours()) + ':00';
+    },
+    timegridNowIndicatorLabel(p) {
+      return fmtTime(p.time && p.time.toDate ? p.time.toDate() : new Date(p.time));
+    },
     // Read-only viewer: hide the popup's Edit/Delete actions
     popupEdit() { return ''; },
     popupDelete() { return ''; },
@@ -128,7 +128,7 @@ const calendar = new tui.Calendar('#calendar', {
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
 
-if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) {
+if (OPTS.theme === 'dark' || (OPTS.theme === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
   calendar.setTheme({
     common: {
       backgroundColor: '#133556', border: '1px solid #234a6d',

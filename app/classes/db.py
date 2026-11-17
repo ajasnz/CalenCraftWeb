@@ -272,6 +272,15 @@ class CalendarDB:
             self.conn.rollback()
             raise
 
+    def update_calendar_appearance(self, calendar_id, values):
+        """Save validated viewer-appearance values (see viewer_appearance.clean_values)."""
+        from app.functions import viewer_appearance as va
+        cols = [c for c in va.COLUMNS if c in values]          # names come from our whitelist, never the request
+        if not cols:
+            return
+        self._execute("UPDATE calendars SET " + ", ".join(f"{c} = ?" for c in cols) + " WHERE id = ?",
+                      [values[c] for c in cols] + [calendar_id])
+
     # ------------------------------------------------------------------
     # Event overrides
     # ------------------------------------------------------------------
@@ -386,7 +395,8 @@ class CalendarDB:
             return self._execute(sql, [values[c] for c in cols], commit=False)
 
         try:
-            fields = {k: v for k, v in clean["calendar"].items() if k in ci.CAL_FIELDS}
+            from app.functions import viewer_appearance as _va
+            fields = {k: v for k, v in clean["calendar"].items() if k in ci.CAL_FIELDS or k in _va.COLUMNS}
             cal_id = insert("calendars", {"user_id": user_id, "slug": slug, "title": title, **fields})
 
             source_ids = {}

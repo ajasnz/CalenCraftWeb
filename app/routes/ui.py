@@ -465,6 +465,29 @@ def calendar_import_confirm():
     return redirect(url_for("ui.calendar_detail", calendar_slug=slugify(title)))
 
 
+@ui_bp.route("/calendars/<calendar_slug>/appearance", methods=["POST"])
+@login_required
+def calendar_appearance(calendar_slug):
+    """Save how the public viewer looks and behaves (Sharing tab → Viewer appearance)."""
+    from app.functions import viewer_appearance as va
+    cal = _owned_calendar_or_404(calendar_slug)
+    f = request.form
+    values, errors = va.clean_values({
+        "viewer_default_view": f.get("default_view"), "viewer_week_start": f.get("week_start"),
+        "viewer_time_format": f.get("time_format"), "viewer_hide_weekends": f.get("hide_weekends"),
+        "viewer_hour_start": f.get("hour_start"), "viewer_hour_end": f.get("hour_end"),
+        "viewer_theme": f.get("theme"), "viewer_views": f.getlist("views"), "viewer_footer": f.get("footer"),
+    })
+    if errors:
+        for e in errors:
+            flash(e, "error")
+        return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing") + "#appearance")
+    current_app.db.update_calendar_appearance(cal["id"], values)
+    audit("calendar.appearance_changed", f"calendar:{calendar_slug}")
+    flash("Viewer appearance saved.", "success")
+    return redirect(url_for("ui.calendar_detail", calendar_slug=calendar_slug, tab="sharing") + "#appearance")
+
+
 @ui_bp.route("/calendars/<calendar_slug>/duplicate", methods=["POST"])
 @login_required
 def calendar_duplicate(calendar_slug):

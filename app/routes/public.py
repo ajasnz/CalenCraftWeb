@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, session, abort, current_a
 from werkzeug.security import check_password_hash
 from app.classes.calendar import CalendarBuilder
 from app.functions import cache as feed_cache
+from app.functions import viewer_appearance as appearance
 
 public_bp = Blueprint("public", __name__)
 
@@ -111,6 +112,12 @@ def _redact_events(events, cfg):
     return events
 
 
+def _accent_of(cfg):
+    """The same sanitising the templates apply: only #rrggbb is trusted."""
+    raw = cfg.get("viewer_color") or "#00a9ff"
+    return raw if raw.startswith("#") and len(raw) == 7 else "#00a9ff"
+
+
 def _session_key(user_slug, calendar_slug, view_slug):
     return f"pub_auth_{user_slug}_{calendar_slug}_{view_slug}"
 
@@ -167,6 +174,7 @@ def viewer(user_slug, calendar_slug, view_slug):
         cfg=cfg, user_slug=user_slug,
         calendar_slug=calendar_slug, view_slug=view_slug,
         today=today, links=links, subscribe_url=subscribe_url,
+        opts=appearance.view_options(cfg), accent_ink=appearance.ink_for(_accent_of(cfg)),
     )
 
 
@@ -189,7 +197,7 @@ def embed(user_slug, calendar_slug, view_slug):
         "embed_viewer.html",
         cfg=cfg, user_slug=user_slug,
         calendar_slug=calendar_slug, view_slug=view_slug,
-        links=links,
+        links=links, opts=appearance.view_options(cfg), accent_ink=appearance.ink_for(_accent_of(cfg)),
     )
 
 

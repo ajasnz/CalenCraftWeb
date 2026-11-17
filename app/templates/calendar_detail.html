@@ -466,6 +466,51 @@
     </div>
   </form>
 
+  <div class="form-card" id="appearance" style="margin-top:1.25rem">
+    <div class="form-card-title">Viewer appearance</div>
+    <p class="hint" style="margin-bottom:.8rem">How the public web viewer and embed look and behave. Defaults match how they worked before.</p>
+    <form method="post" action="{{ url_for('ui.calendar_appearance', calendar_slug=cal.slug) }}">
+      <label>Views visitors can use</label>
+      <div class="checks">
+        {% for v, label in [('month','Month'),('week','Week'),('day','Day'),('list','List')] %}
+        <label class="checkbox-label"><input type="checkbox" name="views" value="{{ v }}" {% if v in (cal.viewer_views or 'month,week,day,list').split(',') %}checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+      </div>
+      <label for="ap-default">Opens on</label>
+      <select id="ap-default" name="default_view">
+        <option value="auto" {% if cal.viewer_default_view == 'auto' %}selected{% endif %}>Automatic (day on phones, month elsewhere)</option>
+        {% for v, label in [('month','Month'),('week','Week'),('day','Day'),('list','List')] %}
+        <option value="{{ v }}" {% if cal.viewer_default_view == v %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <label for="ap-week">Week starts on</label>
+      <select id="ap-week" name="week_start">
+        <option value="1" {% if cal.viewer_week_start != 0 %}selected{% endif %}>Monday</option>
+        <option value="0" {% if cal.viewer_week_start == 0 %}selected{% endif %}>Sunday</option>
+      </select>
+      <label for="ap-time">Clock</label>
+      <select id="ap-time" name="time_format">
+        <option value="24h" {% if cal.viewer_time_format != '12h' %}selected{% endif %}>24-hour (17:30)</option>
+        <option value="12h" {% if cal.viewer_time_format == '12h' %}selected{% endif %}>12-hour (5:30 pm)</option>
+      </select>
+      <label for="ap-hs">Visible hours in week and day views</label>
+      <div style="display:flex;gap:.6rem;align-items:center">
+        <input id="ap-hs" name="hour_start" type="number" min="0" max="23" value="{{ cal.viewer_hour_start if cal.viewer_hour_start is not none else 0 }}" style="width:5.5rem"> to
+        <input id="ap-he" name="hour_end" type="number" min="1" max="24" value="{{ cal.viewer_hour_end if cal.viewer_hour_end is not none else 24 }}" style="width:5.5rem" aria-label="Last visible hour">
+      </div>
+      <label class="checkbox-label" style="margin-top:.7rem"><input type="checkbox" name="hide_weekends" value="1" {% if cal.viewer_hide_weekends %}checked{% endif %}> Hide weekends</label>
+      <label for="ap-theme">Theme</label>
+      <select id="ap-theme" name="theme">
+        <option value="auto" {% if cal.viewer_theme == 'auto' %}selected{% endif %}>Automatic (follow the visitor's device)</option>
+        <option value="light" {% if cal.viewer_theme == 'light' %}selected{% endif %}>Always light</option>
+        <option value="dark" {% if cal.viewer_theme == 'dark' %}selected{% endif %}>Always dark</option>
+      </select>
+      <label for="ap-footer">Footer note <span style="font-weight:400;color:var(--muted)">(optional, links become clickable)</span></label>
+      <textarea id="ap-footer" name="footer" rows="2" maxlength="300" placeholder="e.g. Questions? Email hello@example.com">{{ cal.viewer_footer or '' }}</textarea>
+      <button type="submit" class="btn" style="margin-top:.9rem">Save appearance</button>
+    </form>
+  </div>
+
   <div class="form-card" id="feed-access" style="margin-top:1.25rem">
     <div class="form-card-title">Subscription access</div>
     {% if new_feed_token %}
