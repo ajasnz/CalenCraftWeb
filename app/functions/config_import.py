@@ -205,6 +205,15 @@ def validate_config(data, *, url_validator, slugify, sanitize_color,
                       "target_property": tprop, "action": raction,
                       "target_value": _str(r.get("target_value"), 2000, errors, f"{where}.target_value")})
 
+    # viewer appearance: only validated when the file carries it (older exports leave the defaults)
+    from app.functions import viewer_appearance as va
+    appearance_raw = {k: cal[k] for k in va.COLUMNS if k in cal}
+    if appearance_raw:
+        values, problems = va.clean_values(appearance_raw)
+        for msg in problems:
+            errors.add("calendar: " + msg)
+        clean_cal.update(values)
+
     if clean_cal.get("share_viewer"):
         warnings.append("This calendar's public web viewer will be ON after import.")
 

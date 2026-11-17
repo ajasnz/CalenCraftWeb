@@ -1,5 +1,6 @@
+{% from '_viewer_dark.html' import dark_css -%}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if opts.theme != 'auto' %} data-theme="{{ opts.theme }}"{% endif %}>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -78,7 +79,10 @@
     }
     .view-btn:last-child { border-right: none; }
     .view-btn:hover { background: var(--surface-2); color: var(--text); }
-    .view-btn.active { background: var(--accent); color: #fff; }
+    .view-btn.active { background: var(--accent); color: {{ accent_ink }}; }
+    .view-btn[hidden], .view-toggle[hidden] { display: none; }
+    .pub-note { margin: .5rem 0 0; font-size: .82rem; color: var(--muted); text-align: center; white-space: pre-line; overflow-wrap: anywhere; }
+    .pub-note a { color: var(--accent); }
 
     .cal-wrap {
       background: var(--surface); border: 1px solid var(--border);
@@ -106,23 +110,8 @@
     .loading-label { font-size: .82rem; color: var(--muted); }
 
 
-    /* ── Dark mode (follows the visitor's OS setting) ─────────────────── */
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --accent-soft: color-mix(in srgb, {{ _accent }} 24%, #0c2340);
-        --bg: #0c2340; --surface: #133556; --surface-2: #0f2b49;
-        --border: #234a6d; --border-2: #2f5b82; --text: #f2f5f9; --muted: #a9bdd0;
-        --shadow-sm: 0 1px 3px rgba(0,0,0,.4); --shadow-md: 0 8px 24px -8px rgba(0,0,0,.55);
-        color-scheme: dark;
-      }
-      #cal-loading { background: rgba(19,53,86,.85); }
-      .toastui-calendar-weekday-event-dot ~ .toastui-calendar-weekday-event-title, .toastui-calendar-weekday-event-dot + .toastui-calendar-weekday-event-title { color: var(--text) !important; }
-      .toastui-calendar-daygrid-cell { border-left-color: var(--border) !important; border-top-color: var(--border) !important; }
-      .toastui-calendar-popup-container, .toastui-calendar-detail-container,
-      .toastui-calendar-see-more-container { background: var(--surface) !important; color: var(--text) !important; border-color: var(--border) !important; }
-      .toastui-calendar-popup-section-item, .toastui-calendar-popup-section { border-color: var(--border) !important; color: var(--text) !important; }
-      .toastui-calendar-detail-item, .toastui-calendar-content, .toastui-calendar-template-popupDetailTitle { color: var(--text) !important; }
-    }
+    /* ── Dark mode: the visitor's OS, or forced by the owner ── */
+    {{ dark_css(_accent) }}
 
     @media (max-width: 600px) {
       .pub-header { padding: 1rem; }
@@ -226,11 +215,11 @@
       <button class="nav-btn" id="btn-next" title="Next" aria-label="Next period">&#8250;</button>
       <button class="nav-btn today-btn" id="btn-today" title="Today" aria-label="Jump to today">&#9679;</button>
     </div>
-    <div class="view-toggle" role="group" aria-label="Calendar view">
-      <button class="view-btn" data-view="month" aria-pressed="false">Month</button>
-      <button class="view-btn" data-view="week" aria-pressed="false">Week</button>
-      <button class="view-btn" data-view="day" aria-pressed="false">Day</button>
-      <button class="view-btn" data-view="list" aria-pressed="false">List</button>
+    <div class="view-toggle" role="group" aria-label="Calendar view"{% if opts.views|length < 2 %} hidden{% endif %}>
+      <button class="view-btn" data-view="month" aria-pressed="false"{% if 'month' not in opts.views %} hidden{% endif %}>Month</button>
+      <button class="view-btn" data-view="week" aria-pressed="false"{% if 'week' not in opts.views %} hidden{% endif %}>Week</button>
+      <button class="view-btn" data-view="day" aria-pressed="false"{% if 'day' not in opts.views %} hidden{% endif %}>Day</button>
+      <button class="view-btn" data-view="list" aria-pressed="false"{% if 'list' not in opts.views %} hidden{% endif %}>List</button>
     </div>
   </div>
 
@@ -261,6 +250,7 @@
   </div>
 
   <p class="pub-foot"><span id="tz-note"></span><span class="kbd-hint"> · Keys: ← → move · T today · M W D L views · / search</span></p>
+  {% if cfg.viewer_footer %}<p class="pub-note">{{ cfg.viewer_footer|urlize(60, false, '_blank', 'noopener noreferrer') }}</p>{% endif %}
 </div>
 
 <script>
@@ -270,8 +260,15 @@ const ACCENT = {{ _accent | tojson }};
 const DAYS_BEHIND = {{ (cfg.expansion_days_behind or 0) | int }};
 const DAYS_AHEAD  = {{ (cfg.expansion_days_ahead  or 180) | int }};
 
+const OPTS = {{ opts | tojson }};
+const ALLOWED = OPTS.views;
+
 function pad(n) { return String(n).padStart(2, '0'); }
-function fmtTime(date) { return pad(date.getHours()) + ':' + pad(date.getMinutes()); }
+function fmtTime(date) {
+  const h = date.getHours(), m = date.getMinutes();
+  if (!OPTS.time12) return pad(h) + ':' + pad(m);
+  return (h % 12 || 12) + ':' + pad(m) + (h < 12 ? ' am' : ' pm');
+}
 const { escHtml, linkify, localDayKey, eventToIcs, googleCalendarUrl, safeFileName,
         parseHash, buildHash, matchesQuery } = window.CCViewer;
 
@@ -284,14 +281,22 @@ const calendar = new tui.Calendar('#calendar', {
   isReadOnly: true,
   useDetailPopup: true,
   usageStatistics: false,
-  week: { startDayOfWeek: 1, hourStart: 0, hourEnd: 24, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true },
-  month: { startDayOfWeek: 1 },
+  week: { startDayOfWeek: OPTS.weekStart, hourStart: OPTS.hourStart, hourEnd: OPTS.hourEnd, eventView: ['time', 'allday'], taskView: false, narrowWeekend: true, workweek: OPTS.hideWeekends },
+  month: { startDayOfWeek: OPTS.weekStart, workweek: OPTS.hideWeekends },
   template: {
     time(event) {
       const showTime = event.raw && event.raw.showTime;
       return (showTime ? fmtTime(event.start.toDate()) + ' ' : '') + (event.title);
     },
     allday(event) { return event.title; },
+    // keep the time-grid labels in the owner's chosen clock format (tui defaults to "7 am")
+    timegridDisplayPrimaryTime(p) {
+      const d = p.time && p.time.toDate ? p.time.toDate() : new Date(p.time);
+      return OPTS.time12 ? ((d.getHours() % 12 || 12) + (d.getHours() < 12 ? ' am' : ' pm')) : pad(d.getHours()) + ':00';
+    },
+    timegridNowIndicatorLabel(p) {
+      return fmtTime(p.time && p.time.toDate ? p.time.toDate() : new Date(p.time));
+    },
     // Read-only viewer: hide the popup's Edit/Delete actions
     popupEdit() { return ''; },
     popupDelete() { return ''; },
@@ -299,7 +304,7 @@ const calendar = new tui.Calendar('#calendar', {
   calendars: [{ id: 'cal1', name: 'Events', backgroundColor: ACCENT, borderColor: ACCENT, dragBackgroundColor: ACCENT }],
 });
 
-if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) {
+if (OPTS.theme === 'dark' || (OPTS.theme === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) {
   calendar.setTheme({
     common: {
       backgroundColor: '#133556', border: '1px solid #234a6d',
@@ -571,12 +576,13 @@ document.addEventListener('keydown', e => {
     return;
   }
   const views = { m: 'month', w: 'week', d: 'day', l: 'list' };
+  const allowedKey = key => views[key] && ALLOWED.includes(views[key]);
   const k = e.key.toLowerCase();
   if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
   else if (k === 't') goToday();
-  else if (views[k]) { switchView(views[k]); syncHash(); }
-  else if (e.key === '/') { e.preventDefault(); if (currentView !== 'list') { switchView('list'); syncHash(); } document.getElementById('list-search').focus(); }
+  else if (allowedKey(k)) { switchView(views[k]); syncHash(); }
+  else if (e.key === '/' && ALLOWED.includes('list')) { e.preventDefault(); if (currentView !== 'list') { switchView('list'); syncHash(); } document.getElementById('list-search').focus(); }
 });
 
 // ── Subscribe + timezone note ─────────────────────────────────────────────────
@@ -602,7 +608,9 @@ document.querySelectorAll('.view-btn').forEach(btn => {
   const isMobile = window.innerWidth <= 600;
   if (st.query) { searchQuery = st.query; document.getElementById('list-search').value = st.query; }
   if (st.date) { listAnchor = new Date(st.date); calendar.setDate(st.date); }
-  switchView(st.view || (st.query ? 'list' : (isMobile ? 'day' : 'month')));
+  const auto = isMobile ? 'day' : 'month';
+  const wanted = st.view || (st.query && ALLOWED.includes('list') ? 'list' : (OPTS.defaultView === 'auto' ? auto : OPTS.defaultView));
+  switchView(ALLOWED.includes(wanted) ? wanted : (ALLOWED.includes(auto) ? auto : ALLOWED[0]));
   fetchAllEvents(); // single fetch — shows spinner until done
 })();
 </script>
