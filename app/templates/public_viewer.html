@@ -7,6 +7,7 @@
   <title>{{ cfg.viewer_title or cfg.title }}</title>
   <link rel="stylesheet" href="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.css">
   <script src="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js"></script>
+  <script src="{{ url_for('static', filename='viewer-helpers.js') }}"></script>
   {# Sanitise accent colour — only allow #rrggbb to prevent CSS injection #}
   {% set _raw_color = cfg.viewer_color or '#00a9ff' %}
   {% set _accent = _raw_color if _raw_color.startswith('#') and _raw_color|length == 7 else '#00a9ff' %}
@@ -162,8 +163,30 @@
     .list-event-body { flex: 1; min-width: 0; }
     .list-event-title { font-weight: 600; font-size: .9rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .list-event-meta { font-size: .78rem; color: var(--muted); margin-top: .1rem; display: flex; flex-wrap: wrap; gap: 0 .75rem; }
+    .list-event-meta span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+    .list-event-meta .le-loc { flex: 1 1 8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
     .list-window-nav { display: flex; align-items: center; justify-content: space-between; padding: .7rem .9rem; border-top: 1px solid var(--border); }
     .list-window-label { font-size: .82rem; color: var(--muted); }
+
+    .cal-error { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .7rem .9rem; margin-bottom: 1rem;
+      background: #fdecec; color: #991b1b; border: 1px solid #fecaca; border-radius: var(--radius-sm); font-size: .88rem; }
+    .cal-error[hidden] { display: none; }
+    .retry-btn { padding: .3rem .8rem; border: 1px solid currentColor; border-radius: 99px; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+    .list-tools { display: flex; align-items: center; gap: .75rem; padding: .7rem .9rem; border-bottom: 1px solid var(--border); }
+    .list-search { flex: 1; max-width: 22rem; padding: .45rem .7rem; font: inherit; font-size: .85rem; color: var(--text); background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-sm); }
+    .list-search:focus-visible, .list-event:focus-visible, .view-btn:focus-visible, .nav-btn:focus-visible, .pub-link:focus-visible, .retry-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .list-count { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+    .list-event.open { background: var(--surface-2); }
+    .list-detail { margin-top: .5rem; font-size: .84rem; color: var(--text); overflow-wrap: anywhere; }
+    .list-detail[hidden] { display: none; }
+    .list-detail .ld-row { margin: .15rem 0; color: var(--muted); }
+    .list-detail .ld-desc { margin: .45rem 0; white-space: pre-wrap; }
+    .list-detail a { color: var(--accent); }
+    .ld-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+    button.pub-link { font-family: inherit; cursor: pointer; }
+    .pub-foot { margin: .9rem 0 0; font-size: .75rem; color: var(--muted); text-align: center; }
+    @media (hover: none) { .kbd-hint { display: none; } }
+    @media (prefers-color-scheme: dark) { .cal-error { background: #3a1c26; color: #f4a3a3; border-color: #6a2c3a; } }
 
     @media print {
       .toolbar { display: none !important; }
@@ -186,23 +209,34 @@
       {% endfor %}
     </div>
     {% endif %}
+    {% if subscribe_url %}
+    <div class="pub-links">
+      <a class="pub-link" id="subscribe-link" href="{{ subscribe_url }}" data-feed="{{ subscribe_url }}">Subscribe</a>
+      <button type="button" class="pub-link" id="copy-feed" data-feed="{{ subscribe_url }}">Copy feed link</button>
+    </div>
+    {% endif %}
   </div>
 </div>
 
 <div class="pub-body">
   <div class="toolbar">
     <div class="nav-group">
-      <button class="nav-btn" id="btn-prev" title="Previous">&#8249;</button>
-      <span class="period-label" id="period-label"></span>
-      <button class="nav-btn" id="btn-next" title="Next">&#8250;</button>
-      <button class="nav-btn today-btn" id="btn-today" title="Today">&#9679;</button>
+      <button class="nav-btn" id="btn-prev" title="Previous" aria-label="Previous period">&#8249;</button>
+      <span class="period-label" id="period-label" aria-live="polite"></span>
+      <button class="nav-btn" id="btn-next" title="Next" aria-label="Next period">&#8250;</button>
+      <button class="nav-btn today-btn" id="btn-today" title="Today" aria-label="Jump to today">&#9679;</button>
     </div>
-    <div class="view-toggle">
-      <button class="view-btn" data-view="month">Month</button>
-      <button class="view-btn" data-view="week">Week</button>
-      <button class="view-btn" data-view="day">Day</button>
-      <button class="view-btn" data-view="list">List</button>
+    <div class="view-toggle" role="group" aria-label="Calendar view">
+      <button class="view-btn" data-view="month" aria-pressed="false">Month</button>
+      <button class="view-btn" data-view="week" aria-pressed="false">Week</button>
+      <button class="view-btn" data-view="day" aria-pressed="false">Day</button>
+      <button class="view-btn" data-view="list" aria-pressed="false">List</button>
     </div>
+  </div>
+
+  <div id="cal-error" class="cal-error" role="alert" hidden>
+    <span id="cal-error-msg"></span>
+    <button type="button" class="retry-btn" id="cal-error-retry">Try again</button>
   </div>
 
   <div class="cal-wrap">
@@ -214,6 +248,10 @@
   </div>
 
   <div class="cal-wrap list-view" id="list-view">
+    <div class="list-tools">
+      <input id="list-search" class="list-search" type="search" placeholder="Search events" aria-label="Search events" autocomplete="off">
+      <span id="list-count" class="list-count" aria-live="polite"></span>
+    </div>
     <div id="list-content"></div>
     <div class="list-window-nav">
       <button class="nav-btn" id="list-prev" title="Previous period">&#8249;</button>
@@ -221,6 +259,8 @@
       <button class="nav-btn" id="list-next" title="Next period">&#8250;</button>
     </div>
   </div>
+
+  <p class="pub-foot"><span id="tz-note"></span><span class="kbd-hint"> · Keys: ← → move · T today · M W D L views · / search</span></p>
 </div>
 
 <script>
@@ -232,9 +272,8 @@ const DAYS_AHEAD  = {{ (cfg.expansion_days_ahead  or 180) | int }};
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function fmtTime(date) { return pad(date.getHours()) + ':' + pad(date.getMinutes()); }
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+const { escHtml, linkify, localDayKey, eventToIcs, googleCalendarUrl, safeFileName,
+        parseHash, buildHash, matchesQuery } = window.CCViewer;
 
 // ── All events fetched once ───────────────────────────────────────────────────
 let allEvents = [];      // raw JSON from server, cached for the session
@@ -290,7 +329,14 @@ function setLoading(on) {
   document.getElementById('cal-loading').classList.toggle('hidden', !on);
 }
 
+function showError(msg) {
+  document.getElementById('cal-error-msg').textContent = msg;
+  document.getElementById('cal-error').hidden = false;
+}
+
 async function fetchAllEvents() {
+  document.getElementById('cal-error').hidden = true;
+  setLoading(true);
   const now = new Date();
   const start = new Date(now); start.setDate(start.getDate() - DAYS_BEHIND);
   const end   = new Date(now); end.setDate(end.getDate() + DAYS_AHEAD);
@@ -299,14 +345,20 @@ async function fetchAllEvents() {
     + '&end='   + encodeURIComponent(end.toISOString());
   try {
     const res = await fetch(url);
-    if (!res.ok) return;
+    if (res.status === 401) { showError('Your session has expired. Reload the page to sign in again.'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     allEvents = await res.json();
     eventsLoaded = true;
+    calendar.clear();
     calendar.createEvents(allEvents);
+    if (currentView === 'list') renderListView();
+  } catch (err) {
+    showError("Couldn't load events. Check your connection and try again.");
   } finally {
     setLoading(false);
   }
 }
+document.getElementById('cal-error-retry').addEventListener('click', fetchAllEvents);
 
 function periodLabel(view) {
   const monthFmt = d => d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -341,49 +393,62 @@ function fmtListPeriod(start, end) {
   return fmt(start) + ' – ' + fmt(new Date(end.getTime() - 1)) + ' ' + y;
 }
 
-// Day bucket in the visitor's own timezone (toISOString() would bucket by UTC date)
-function localDayKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+let searchQuery = '';
+let listShown = [];          // events currently rendered, so a click can find its event by index
+
+function evTimeText(ev) {
+  if (ev.isAllday) return 'All day';
+  const s = new Date(ev.start), e = new Date(ev.end || ev.start);
+  return fmtTime(s) + (e > s ? '–' + fmtTime(e) : '');
+}
 
 function renderListView() {
-  const { start, end } = listWindowDates();
-  document.getElementById('list-period-label').textContent = fmtListPeriod(start, end);
+  const nav = document.querySelector('.list-window-nav');
+  const searching = !!searchQuery;
+  let visible;
+  if (searching) {
+    visible = allEvents.filter(ev => matchesQuery(ev, searchQuery)).sort((a, b) => new Date(a.start) - new Date(b.start)).slice(0, 300);
+    document.getElementById('list-period-label').textContent = '';
+    document.getElementById('list-count').textContent = visible.length + (visible.length === 1 ? ' match' : ' matches');
+  } else {
+    const { start, end } = listWindowDates();
+    document.getElementById('list-period-label').textContent = fmtListPeriod(start, end);
+    const startMs = start.getTime(), endMs = end.getTime();
+    visible = allEvents.filter(ev => { const t = new Date(ev.start).getTime(); return t >= startMs && t < endMs; });
+    document.getElementById('list-count').textContent = visible.length ? visible.length + (visible.length === 1 ? ' event' : ' events') : '';
+  }
+  nav.style.display = searching ? 'none' : '';
+  listShown = visible;
   const content = document.getElementById('list-content');
 
-  const startMs = start.getTime();
-  const endMs   = end.getTime();
-  const visible = allEvents.filter(ev => {
-    const evStart = new Date(ev.start).getTime();
-    return evStart >= startMs && evStart < endMs;
-  });
-
   if (!visible.length) {
-    content.innerHTML = '<p class="list-empty">No events in this period.</p>';
+    content.innerHTML = '<p class="list-empty">' + (searching ? 'No events match “' + escHtml(searchQuery) + '”.' : 'No events in this period.') + '</p>';
     return;
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const groups = {};
   const groupOrder = [];
-  for (const ev of visible) {
+  visible.forEach((ev, i) => {
     const d = new Date(ev.start);
     const key = localDayKey(d);
     if (!groups[key]) { groups[key] = { date: d, events: [] }; groupOrder.push(key); }
-    groups[key].events.push(ev);
-  }
+    groups[key].events.push([ev, i]);
+  });
 
   content.innerHTML = groupOrder.map(key => {
     const { date, events: evs } = groups[key];
-    const isToday = date.getTime() === today.getTime();
+    const isToday = localDayKey(date) === localDayKey(today);
     const dayNum  = date.toLocaleDateString(undefined, { day: 'numeric' });
     const dayName = date.toLocaleDateString(undefined, { weekday: 'short', month: 'short' });
-    const evHtml = evs.map(ev => {
-      const timePart = ev.isAllday ? 'All day' : fmtTime(new Date(ev.start));
-      const loc = ev.location ? `<span>${escHtml(ev.location)}</span>` : '';
-      return `<div class="list-event">
+    const evHtml = evs.map(([ev, i]) => {
+      const loc = ev.location ? `<span class="le-loc" title="${escHtml(ev.location)}">${escHtml(ev.location)}</span>` : '';
+      return `<div class="list-event" data-i="${i}" tabindex="0" role="button" aria-expanded="false">
         <div class="list-event-dot"></div>
         <div class="list-event-body">
           <div class="list-event-title">${escHtml(ev.title || 'Busy')}</div>
-          <div class="list-event-meta"><span>${timePart}</span>${loc}</div>
+          <div class="list-event-meta"><span>${evTimeText(ev)}</span>${loc}</div>
+          <div class="list-detail" hidden></div>
         </div>
       </div>`;
     }).join('');
@@ -396,13 +461,55 @@ function renderListView() {
   }).join('');
 }
 
+function detailHtml(ev) {
+  const when = new Date(ev.start).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return '<div class="ld-row">' + escHtml(when) + '</div>' +
+    (ev.location && (/https?:\/\//.test(ev.location) || ev.location.length > 45) ? '<div class="ld-row">Location: ' + linkify(ev.location) + '</div>' : '') +
+    (ev.body ? '<div class="ld-desc">' + linkify(ev.body) + '</div>' : '') +
+    '<div class="ld-actions"><button type="button" class="pub-link" data-act="ics">Add to calendar (.ics)</button>' +
+    '<a class="pub-link" href="' + escHtml(googleCalendarUrl(ev)) + '" target="_blank" rel="noopener noreferrer">Google Calendar ↗</a></div>';
+}
+
+function toggleListEvent(row) {
+  const open = row.classList.toggle('open');
+  row.setAttribute('aria-expanded', String(open));
+  const box = row.querySelector('.list-detail');
+  if (open && !box.innerHTML) box.innerHTML = detailHtml(listShown[+row.dataset.i]);
+  box.hidden = !open;
+}
+
+document.getElementById('list-content').addEventListener('click', e => {
+  const ics = e.target.closest('[data-act="ics"]');
+  const row = e.target.closest('.list-event');
+  if (!row) return;
+  if (ics) {
+    const ev = listShown[+row.dataset.i];
+    const url = URL.createObjectURL(new Blob([eventToIcs(ev)], { type: 'text/calendar;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = safeFileName(ev.title);
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
+  }
+  if (e.target.closest('a, .list-detail')) return;       // clicking links/text inside the details shouldn't collapse them
+  toggleListEvent(row);
+});
+document.getElementById('list-content').addEventListener('keydown', e => {
+  const row = e.target.closest('.list-event');
+  if (row && e.target === row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleListEvent(row); }
+});
+
+let searchTimer = null;
+document.getElementById('list-search').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { searchQuery = e.target.value.trim(); renderListView(); syncHash(); }, 150);
+});
+
 document.getElementById('list-prev').addEventListener('click', () => {
   listAnchor.setDate(listAnchor.getDate() - LIST_WINDOW);
-  renderListView();
+  renderListView(); syncHash();
 });
 document.getElementById('list-next').addEventListener('click', () => {
   listAnchor.setDate(listAnchor.getDate() + LIST_WINDOW);
-  renderListView();
+  renderListView(); syncHash();
 });
 
 // ── View switching ────────────────────────────────────────────────────────────
@@ -427,19 +534,63 @@ function switchView(view) {
     calendar.changeView(view);
     updateLabel();
   }
-  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view-btn').forEach(b => {
+    const on = b.dataset.view === view;
+    b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on));
+  });
 }
 
-document.getElementById('btn-prev').addEventListener('click', () => { calendar.prev(); updateLabel(); });
-document.getElementById('btn-next').addEventListener('click', () => { calendar.next(); updateLabel(); });
-document.getElementById('btn-today').addEventListener('click', () => {
-  if (currentView === 'list') {
-    listAnchor = new Date(); listAnchor.setHours(0, 0, 0, 0);
-    renderListView();
-  } else {
-    calendar.today(); updateLabel();
+function goPrev() {
+  if (currentView === 'list') document.getElementById('list-prev').click(); else { calendar.prev(); updateLabel(); syncHash(); }
+}
+function goNext() {
+  if (currentView === 'list') document.getElementById('list-next').click(); else { calendar.next(); updateLabel(); syncHash(); }
+}
+function goToday() {
+  if (currentView === 'list') { listAnchor = new Date(); listAnchor.setHours(0, 0, 0, 0); renderListView(); }
+  else { calendar.today(); updateLabel(); }
+  syncHash();
+}
+document.getElementById('btn-prev').addEventListener('click', goPrev);
+document.getElementById('btn-next').addEventListener('click', goNext);
+document.getElementById('btn-today').addEventListener('click', goToday);
+
+// ── Shareable URL state: #v=week&d=2026-11-03&q=maker ─────────────────────────
+function currentDate() { return currentView === 'list' ? listAnchor : calendar.getDate().toDate(); }
+function syncHash() {
+  const h = buildHash({ view: currentView, date: currentDate(), query: searchQuery });
+  history.replaceState(null, '', location.pathname + location.search + h);
+}
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, tag = (t.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable) {
+    if (e.key === 'Escape' && t.id === 'list-search') { t.value = ''; searchQuery = ''; renderListView(); syncHash(); t.blur(); }
+    return;
   }
+  const views = { m: 'month', w: 'week', d: 'day', l: 'list' };
+  const k = e.key.toLowerCase();
+  if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
+  else if (k === 't') goToday();
+  else if (views[k]) { switchView(views[k]); syncHash(); }
+  else if (e.key === '/') { e.preventDefault(); if (currentView !== 'list') { switchView('list'); syncHash(); } document.getElementById('list-search').focus(); }
 });
+
+// ── Subscribe + timezone note ─────────────────────────────────────────────────
+(function () {
+  const sub = document.getElementById('subscribe-link'), copy = document.getElementById('copy-feed');
+  if (sub) sub.href = sub.dataset.feed.replace(/^https?:/, 'webcal:');
+  if (copy) copy.addEventListener('click', async () => {
+    const old = copy.textContent;
+    try { await navigator.clipboard.writeText(copy.dataset.feed); copy.textContent = 'Copied!'; }
+    catch (e) { window.prompt('Feed link', copy.dataset.feed); }
+    setTimeout(() => { copy.textContent = old; }, 1800);
+  });
+  document.getElementById('tz-note').textContent = 'Times are shown in your timezone (' + Intl.DateTimeFormat().resolvedOptions().timeZone + ').';
+})();
 
 document.querySelectorAll('.view-btn').forEach(btn => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
@@ -447,8 +598,11 @@ document.querySelectorAll('.view-btn').forEach(btn => {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 (function init() {
+  const st = parseHash(location.hash);
   const isMobile = window.innerWidth <= 600;
-  switchView(isMobile ? 'day' : 'month');
+  if (st.query) { searchQuery = st.query; document.getElementById('list-search').value = st.query; }
+  if (st.date) { listAnchor = new Date(st.date); calendar.setDate(st.date); }
+  switchView(st.view || (st.query ? 'list' : (isMobile ? 'day' : 'month')));
   fetchAllEvents(); // single fetch — shows spinner until done
 })();
 </script>

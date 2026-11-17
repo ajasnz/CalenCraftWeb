@@ -154,12 +154,19 @@ def viewer(user_slug, calendar_slug, view_slug):
         except Exception:
             pass
 
+    # The raw .ics feed isn't redacted, so only advertise it when nothing on the viewer is hiding
+    # details or gated behind a password/token; otherwise the link would undermine those settings.
+    can_subscribe = bool(cfg.get("share_ics")) and not (
+        cfg.get("viewer_password") or cfg.get("viewer_free_busy_only")
+        or cfg.get("viewer_hide_private") or cfg.get("feed_token_required"))
+    subscribe_url = f"{request.host_url}feed/{user_slug}/{calendar_slug}/{view_slug}" if can_subscribe else None
+
     today = datetime.date.today()
     return render_template(
         "public_viewer.html",
         cfg=cfg, user_slug=user_slug,
         calendar_slug=calendar_slug, view_slug=view_slug,
-        today=today, links=links,
+        today=today, links=links, subscribe_url=subscribe_url,
     )
 
 
