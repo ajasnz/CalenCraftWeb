@@ -166,3 +166,81 @@ class TestFlow:
         again = build_calendar_export(db, "u", db.get_calendar_by_slug("u", copy["slug"]))
         for key in ("sources", "views", "filters", "rules"):
             assert again[key] == exported[key], key
+
+
+class TestEventOverridesInBackups:
+    def ov(self, **over):
+        d = {"view": None, "event_uid": "standup@x", "instance_start": "2026-11-03T09:00:00",
+             "action": "hide", "new_title": None, "label": "Standup"}
+        d.update(over)
+        return d
+
+    def test_old_exports_without_the_key_still_import(self, app):
+        clean, _w, errors = validate(app, sample())
+        assert errors == [] and clean["event_overrides"] == []
+
+    def test_valid_overrides_are_cleaned_and_deduplicated(self, app):
+        d = sample(event_overrides=[
+            self.ov(), self.ov(instance_start="2026-11-03T09:00:00+13:00"),       # same target after tz is dropped: one wins
+            self.ov(instance_start=None, action="rename", new_title="Sync", view="team"),
+            self.ov(event_uid="lunch@x", instance_start="", view="default")])
+        clean, _w, errors = validate(app, d)
+        assert errors == []
+        got = {(o["event_uid"], o["instance_start"], o["view"]): o for o in clean["event_overrides"]}
+        assert len(got) == 3
+        assert got[("standup@x", None, "team")]["new_title"] == "Sync"
+        assert got[("lunch@x", None, "default")]["action"] == "hide"
+
+    @pytest.mark.parametrize("mutate,needle", [
+        (lambda o: o.update(action="explode"), "hide or rename"),
+        (lambda o: o.update(action="rename", new_title=" "), "needs a title"),
+        (lambda o: o.update(event_uid=""), "must not be empty"),
+        (lambda o: o.update(instance_start="soon"), "not a valid date"),
+        (lambda o: o.update(view="ghost"), "unknown view"),
+        (lambda o: o.update(label="x" * 201), "longer than 200"),
+    ])
+    def test_rejects_bad_overrides(self, app, mutate, needle):
+        o = self.ov()
+        mutate(o)
+        clean, _w, errors = validate(app, sample(event_overrides=[o]))
+        assert clean is None and any(needle in e for e in errors), errors
+
+    def test_limit(self, app):
+        _c, _w, errors = validate(app, sample(event_overrides=[self.ov(event_uid=f"e{i}") for i in range(501)]))
+        assert any("at most 500" in e for e in errors)
+
+    def test_full_round_trip_restores_overrides_and_they_take_effect(self, app, client):
+        from app.routes.ui import build_calendar_export
+        db = app.db
+        client.post("/calendars/import/confirm", data={"payload": json.dumps(sample())})
+        cal = db.get_calendar_by_slug("u", "imported")
+        db.add_event_override(cal["id"], "team", "standup@x", "2026-11-03T09:00:00", "rename", "Kickoff", "Standup")
+        db.add_event_override(cal["id"], None, "lunch@x", None, "hide", None, "Lunch")
+
+        exported = build_calendar_export(db, "u", cal)
+        assert len(exported["event_overrides"]) == 2
+        assert client.get("/calendars/imported/export.json").get_json()["event_overrides"] == exported["event_overrides"]
+
+        r = client.post("/calendars/import/confirm", data={"payload": json.dumps(exported)})
+        assert r.status_code == 302
+        copy = [c for c in db.get_calendars(1) if c["slug"] != "imported"][0]
+        again = build_calendar_export(db, "u", db.get_calendar_by_slug("u", copy["slug"]))
+        assert again["event_overrides"] == exported["event_overrides"]               # lossless
+        assert {o["event_uid"] for o in db.list_event_overrides(copy["id"])} == {"standup@x", "lunch@x"}
+
+    def test_preview_mentions_overrides(self, app, client):
+        page = upload(client, sample(event_overrides=[self.ov()])).get_data(as_text=True)
+        assert "hidden/renamed event" in page
+        assert "hidden/renamed" not in upload(client, sample()).get_data(as_text=True)
+
+    def test_a_failed_import_does_not_leave_overrides_behind(self, app, client, monkeypatch):
+        orig = app.db.__class__._execute
+
+        def boom(self, sql, params=(), commit=True):
+            if "INTO event_overrides" in sql:
+                raise RuntimeError("disk on fire")
+            return orig(self, sql, params, commit)
+        monkeypatch.setattr(app.db.__class__, "_execute", boom)
+        client.post("/calendars/import/confirm", data={"payload": json.dumps(sample(event_overrides=[self.ov()]))})
+        monkeypatch.setattr(app.db.__class__, "_execute", orig)
+        assert app.db.get_calendars(1) == [] and app.db._fetchall("SELECT id FROM event_overrides") == []

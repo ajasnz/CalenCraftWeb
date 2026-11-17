@@ -414,6 +414,11 @@ class CalendarDB:
                                  "filter_pattern": r["filter_pattern"], "filter_action": r["filter_action"],
                                  "include_if_fails": r["include_if_fails"], "target_property": r["target_property"],
                                  "action": r["action"], "target_value": r["target_value"]})
+            import datetime
+            for o in clean.get("event_overrides", []):
+                self._execute(self._named("event_override_insert"), (
+                    cal_id, o["view"], o["event_uid"], o["instance_start"], o["action"], o["new_title"],
+                    o["label"], datetime.datetime.utcnow().isoformat(timespec="seconds")), commit=False)
             self.conn.commit()
         except Exception:
             self.conn.rollback()
