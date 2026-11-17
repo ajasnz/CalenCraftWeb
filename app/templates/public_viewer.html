@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
   <title>{{ cfg.viewer_title or cfg.title }}</title>
   <link rel="stylesheet" href="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.css">
   <script src="https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js"></script>
@@ -340,6 +341,9 @@ function fmtListPeriod(start, end) {
   return fmt(start) + ' – ' + fmt(new Date(end.getTime() - 1)) + ' ' + y;
 }
 
+// Day bucket in the visitor's own timezone (toISOString() would bucket by UTC date)
+function localDayKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
 function renderListView() {
   const { start, end } = listWindowDates();
   document.getElementById('list-period-label').textContent = fmtListPeriod(start, end);
@@ -362,7 +366,7 @@ function renderListView() {
   const groupOrder = [];
   for (const ev of visible) {
     const d = new Date(ev.start);
-    const key = d.toISOString().slice(0, 10);
+    const key = localDayKey(d);
     if (!groups[key]) { groups[key] = { date: d, events: [] }; groupOrder.push(key); }
     groups[key].events.push(ev);
   }

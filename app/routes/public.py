@@ -3,15 +3,33 @@ import datetime
 from flask import Blueprint, render_template, request, session, abort, current_app, jsonify
 from werkzeug.security import check_password_hash
 from app.classes.calendar import CalendarBuilder
+from app.functions import cache as feed_cache
 
 public_bp = Blueprint("public", __name__)
 
 
+@public_bp.after_request
+def _keep_out_of_search_engines(response):
+    """Shared calendars and their data endpoints are for people with the link, not for search results."""
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+def _is_aware(dt):
+    return isinstance(dt, datetime.datetime) and dt.tzinfo is not None
+
+
 def _strip_tz(dt):
+    """Naive datetime for comparisons: zoned times are converted to UTC first.
+
+    Dropping the zone without converting (the old behaviour) turned "08:00 UTC" and
+    "08:00 Auckland" into the same wall-clock value, so visitors saw the wrong time.
+    Dates become midnight; floating (zone-less) times are left as they are.
+    """
     if isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
         dt = datetime.datetime(dt.year, dt.month, dt.day)
-    if hasattr(dt, 'tzinfo') and dt.tzinfo is not None:
-        dt = dt.replace(tzinfo=None)
+    if _is_aware(dt):
+        dt = dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
     return dt
 
 
@@ -51,6 +69,9 @@ def _fetch_events_range(app, user_slug, calendar_slug, view_slug, start, end, cf
         raw = dtstart.dt
         # Detect all-day events (DATE type, not DATETIME)
         is_allday = isinstance(raw, datetime.date) and not isinstance(raw, datetime.datetime)
+        # Only zoned times are real instants. All-day and floating times mean "that wall-clock
+        # time wherever you are", so they must not be shifted into the visitor's zone.
+        is_utc = _is_aware(raw)
         dt = _strip_tz(raw)
         if dt < start or dt >= end:
             continue
@@ -64,6 +85,7 @@ def _fetch_events_range(app, user_slug, calendar_slug, view_slug, start, end, cf
             "start": dt,
             "end": end_dt,
             "is_allday": is_allday,
+            "is_utc": is_utc,
             "is_private": is_private,
             "summary": str(component.get("SUMMARY", "")),
             "description": str(component.get("DESCRIPTION", "")),
@@ -184,7 +206,21 @@ def viewer_events(user_slug, calendar_slug, view_slug):
         end_dt = start_dt + datetime.timedelta(days=42)
 
     app = current_app._get_current_object()
-    events = _fetch_events_range(app, user_slug, calendar_slug, view_slug, start_dt, end_dt, cfg)
+    # Round the window out to whole days so visitors share one cache entry (the browser sends
+    # millisecond-precise bounds). The key starts with "feed:<user>:<calendar>:" so Refresh now,
+    # event overrides and token changes already invalidate it.
+    start_dt = _strip_tz(start_dt).replace(hour=0, minute=0, second=0, microsecond=0)
+    end_dt = _strip_tz(end_dt)
+    end_day = end_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_dt = end_day if end_day == end_dt else end_day + datetime.timedelta(days=1)
+    key = f"feed:{user_slug}:{calendar_slug}:{view_slug}:viewer:{start_dt.date()}:{end_dt.date()}"
+    events = feed_cache.get(key)
+    if events is None:
+        events = _fetch_events_range(app, user_slug, calendar_slug, view_slug, start_dt, end_dt, cfg)
+        feed_cache.set(key, events)
+    # Redaction rewrites titles in place, and privacy settings must apply immediately, so it
+    # runs on a copy after the cache, never before it.
+    events = [dict(e) for e in events]
     _redact_events(events, cfg)
 
     show_time = bool(cfg.get("viewer_show_time"))
@@ -199,8 +235,9 @@ def viewer_events(user_slug, calendar_slug, view_slug):
             "title": e["summary"] or "Busy",
             "body": e["description"] if show_desc else "",
             "location": e["location"] if show_loc else "",
-            "start": e["start"].isoformat(),
-            "end": e["end"].isoformat(),
+            # A trailing Z marks a UTC instant, which the browser shows in the visitor's own zone
+            "start": e["start"].isoformat() + ("Z" if e["is_utc"] else ""),
+            "end": e["end"].isoformat() + ("Z" if e["is_utc"] else ""),
             "isAllday": e["is_allday"],
             "category": "allday" if e["is_allday"] else "time",
             "isVisible": True,
