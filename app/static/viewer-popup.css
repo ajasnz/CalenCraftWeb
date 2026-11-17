@@ -1,0 +1,45 @@
+/* Event dialog for the public viewer and embed. Uses the page's own colour variables. */
+.cc-pop-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem; background: rgba(12, 35, 64, .55);
+  animation: cc-pop-fade .14s ease-out;
+}
+.cc-pop {
+  position: relative; box-sizing: border-box;
+  width: min(30rem, 100%); max-height: min(85vh, 100%); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface, #fff); color: var(--text, #12181c);
+  border: 1px solid var(--border, #dfe6ee); border-top: 4px solid var(--accent, #00a9ff);
+  border-radius: 14px; padding: 1rem 1.25rem 1.15rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+  font-size: .9rem; line-height: 1.5;
+}
+.cc-pop-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.cc-pop h2 { margin: 0; font-size: 1.1rem; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
+.cc-pop-close {
+  flex: none; width: 2rem; height: 2rem; margin: -.25rem -.4rem 0 0; padding: 0;
+  font-size: 1.5rem; line-height: 1; color: var(--muted, #51667b);
+  background: transparent; border: 0; border-radius: 8px; cursor: pointer;
+}
+.cc-pop-close:hover { background: var(--surface-2, #f2f5f9); color: var(--text, #12181c); }
+.cc-pop-when { margin-top: .3rem; color: var(--muted, #51667b); font-weight: 600; font-size: .85rem; }
+.cc-pop-row { margin-top: .6rem; overflow-wrap: anywhere; }
+.cc-pop-label { display: block; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted, #51667b); }
+.cc-pop-desc { margin-top: .7rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cc-pop a { color: var(--accent, #0a6fb0); }
+.cc-pop-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.cc-pop-btn {
+  display: inline-block; padding: .4rem .85rem; font: inherit; font-size: .8rem; font-weight: 700;
+  color: var(--text, #12181c); text-decoration: none; cursor: pointer;
+  background: var(--surface, #fff); border: 1px solid var(--border-2, #cfdae5); border-radius: 99px;
+}
+.cc-pop-btn:hover { border-color: var(--accent, #00a9ff); }
+.cc-pop-close:focus-visible, .cc-pop-btn:focus-visible, .cc-pop a:focus-visible { outline: 2px solid var(--accent, #00a9ff); outline-offset: 2px; }
+html.cc-pop-open { overflow: hidden; }
+
+@media (max-width: 600px) {                                  /* bottom sheet on phones */
+  .cc-pop-overlay { align-items: flex-end; padding: 0; }
+  .cc-pop { width: 100%; border-radius: 16px 16px 0 0; max-height: 80vh; padding-bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px)); }
+}
+@keyframes cc-pop-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cc-pop-overlay { animation: none; } }
