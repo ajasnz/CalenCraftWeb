@@ -194,7 +194,10 @@ def dashboard():
         d["source_count"] = len(sources)
         failing = [s for s in sources if s["enabled"] and s["last_fetch_ok"] == 0]
         d["failing_sources"] = len(failing)
-        d["failing_detail"] = "; ".join(f"{s['name']}: {s['last_fetch_error'] or 'unknown error'}" for s in failing[:3])
+        d["failing_detail"] = "; ".join(
+            f"{s['name']}: {s['last_fetch_error'] or 'unknown error'}"
+            + (f" (failing since {s['failing_since'][:16].replace('T', ' ')} UTC)" if s.get("failing_since") else "")
+            for s in failing[:3])
         d["view_count"]   = len(db.get_views(cal["id"]))
         cal_list.append(d)
     return render_template("dashboard.html", calendars=cal_list, nav_calendars=calendars)

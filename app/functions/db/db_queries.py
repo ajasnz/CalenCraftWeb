@@ -106,7 +106,11 @@ queries = {
         WHERE id=?
     """,
     "source_update_fetch_status": """
-        UPDATE sources SET last_fetch_at=?, last_fetch_ok=?, last_fetch_error=? WHERE id=?
+        UPDATE sources SET
+            last_fetch_at = ?, last_fetch_ok = ?, last_fetch_error = ?,
+            last_success_at = CASE WHEN ? = 1 THEN ? ELSE last_success_at END,
+            failing_since = CASE WHEN ? = 1 THEN NULL ELSE COALESCE(failing_since, ?) END
+        WHERE id = ?
     """,
     "calendar_update_settings": """
         UPDATE calendars SET
@@ -131,7 +135,8 @@ queries = {
 
     # --- Sources ---
     "sources_for_calendar": """
-        SELECT s.id, s.url, s.name, s.enabled, s.last_fetch_ok, s.last_fetch_at, s.last_fetch_error
+        SELECT s.id, s.url, s.name, s.enabled, s.last_fetch_ok, s.last_fetch_at, s.last_fetch_error,
+               s.last_success_at, s.failing_since
         FROM sources s
         JOIN calendar_sources cs ON cs.source_id = s.id
         WHERE cs.calendar_id = ?

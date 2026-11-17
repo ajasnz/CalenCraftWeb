@@ -230,4 +230,19 @@ migrations = {
             CREATE INDEX IF NOT EXISTS idx_event_overrides_calendar ON event_overrides(calendar_id);
         """,
     },
+    9: {
+        "id": 9,
+        "min_app_version": 0,
+        "max_app_version": 1000000,
+        "name": "Source failing-since tracking",
+        "description": "Remember when a source last worked and when its current run of failures began.",
+        "sql": """
+            ALTER TABLE sources ADD COLUMN last_success_at TEXT;
+            ALTER TABLE sources ADD COLUMN failing_since TEXT;
+            -- Best available history for rows that already have a status: a source that last
+            -- succeeded worked then; one that last failed is treated as failing since that check.
+            UPDATE sources SET last_success_at = last_fetch_at WHERE last_fetch_ok = 1;
+            UPDATE sources SET failing_since = last_fetch_at WHERE last_fetch_ok = 0;
+        """,
+    },
 }
